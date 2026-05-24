@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { MoveRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn, initials } from '@/lib/utils'
 import type { SplitVariant, Team, Player } from '@/lib/types'
@@ -66,7 +67,7 @@ export function TeamAdjuster({ variant, onConfirm, onCancel }: Props) {
       return
     }
 
-    // Perform swap
+    // Swap the two players
     const newTeams = teams.map((t) => ({ ...t, players: [...t.players] }))
     const fromTeam = newTeams[selected.teamIdx]
     const toTeam = newTeams[teamIdx]
@@ -88,6 +89,28 @@ export function TeamAdjuster({ variant, onConfirm, onCancel }: Props) {
     setSelected(null)
   }
 
+  const handleMoveToTeam = (teamIdx: number) => {
+    if (!selected || selected.teamIdx === teamIdx) return
+
+    // Move selected player to this team without swapping
+    const newTeams = teams.map((t) => ({ ...t, players: [...t.players] }))
+    const fromTeam = newTeams[selected.teamIdx]
+    const toTeam = newTeams[teamIdx]
+
+    const player = fromTeam.players.find((p) => p.id === selected.playerId)!
+    fromTeam.players = fromTeam.players.filter((p) => p.id !== selected.playerId)
+    toTeam.players = [...toTeam.players, player]
+
+    if (fromTeam.players.length > 0) {
+      newTeams[selected.teamIdx] = recomputeTeam(fromTeam.players, fromTeam)
+    }
+    newTeams[teamIdx] = recomputeTeam(toTeam.players, toTeam)
+
+    setTeams(newTeams)
+    setBalance(computeBalance(newTeams))
+    setSelected(null)
+  }
+
   const handleConfirm = () => {
     onConfirm({ ...variant, teams, balanceScore: balance })
   }
@@ -95,18 +118,29 @@ export function TeamAdjuster({ variant, onConfirm, onCancel }: Props) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-500">Tap two players to swap them between teams</p>
+        <p className="text-xs text-slate-500">
+          {selected ? 'Tap a player to swap · tap a team name to move' : 'Tap a player to select'}
+        </p>
         <span className="text-xs font-semibold text-emerald-600">Balance {(balance * 100).toFixed(0)}%</span>
       </div>
 
       {teams.map((team, ti) => {
         const color = colorFor(team.color)
+        const canMoveTo = selected !== null && selected.teamIdx !== ti
         return (
-          <div key={team.name} className={cn('rounded-xl border p-3', color.light, color.border)}>
-            <div className="flex items-center gap-2 mb-2">
+          <div key={team.name} className={cn('rounded-xl border p-3 transition-all', color.light, color.border, canMoveTo && 'ring-1 ring-inset ring-slate-300')}>
+            <div
+              className={cn('flex items-center gap-2 mb-2', canMoveTo && 'cursor-pointer')}
+              onClick={() => canMoveTo && handleMoveToTeam(ti)}
+            >
               <div className={cn('h-3 w-3 rounded-full', color.bg)} />
               <span className={cn('text-sm font-semibold', color.text)}>{team.name}</span>
-              <span className="text-xs text-slate-400 ml-auto">{team.avgOverall.toFixed(1)} avg</span>
+              <span className="text-xs text-slate-400 ml-auto">{team.players.length}p · {team.avgOverall.toFixed(1)} avg</span>
+              {canMoveTo && (
+                <span className={cn('flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded-full', color.light, color.text)}>
+                  <MoveRight className="h-3 w-3" />Move here
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap gap-1.5">
               {team.players.map((player) => {
