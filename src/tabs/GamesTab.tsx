@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Swords, ChevronDown, ChevronUp, Plus, RefreshCw } from 'lucide-react'
+import { Swords, ChevronDown, ChevronUp, Plus, RefreshCw, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn, initials } from '@/lib/utils'
 import type { Session, Game, Player } from '@/lib/types'
 
@@ -10,6 +11,7 @@ interface Props {
   sessions: Session[]
   players: Player[]
   onRecordGame: (sessionId: string, game: Pick<Game, 'team1' | 'score1' | 'team2' | 'score2'>) => Promise<void>
+  onUpdateGame: (id: string, score1: number, score2: number) => Promise<void>
   onRefresh: () => Promise<void>
   onNewSession: () => void
 }
@@ -67,6 +69,60 @@ function ScoreEntry({ team1, team2, onRecord }: {
   )
 }
 
+function EditGameDialog({ game, onSave, onClose }: {
+  game: Game
+  onSave: (score1: number, score2: number) => Promise<void>
+  onClose: () => void
+}) {
+  const [s1, setS1] = useState(game.score1)
+  const [s2, setS2] = useState(game.score2)
+  const [saving, setSaving] = useState(false)
+  const m1 = teamMeta(game.team1)
+  const m2 = teamMeta(game.team2)
+  const adj = (setter: React.Dispatch<React.SetStateAction<number>>, delta: number) =>
+    setter((v) => Math.max(0, v + delta))
+
+  const submit = async () => {
+    setSaving(true)
+    try { await onSave(s1, s2); onClose() } finally { setSaving(false) }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit score</DialogTitle>
+        </DialogHeader>
+        <div className="flex items-center justify-center gap-4 py-4">
+          <div className="flex flex-col items-center gap-1">
+            <span className={cn('text-sm font-bold', m1.text)}>{capitalize(game.team1)}</span>
+            <div className="flex items-center gap-2">
+              <button className="h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-lg font-bold" onClick={() => adj(setS1, -1)}>−</button>
+              <span className="w-8 text-center text-2xl font-bold text-slate-800">{s1}</span>
+              <button className="h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-lg font-bold" onClick={() => adj(setS1, 1)}>+</button>
+            </div>
+          </div>
+          <span className="text-slate-400 text-xl font-semibold">–</span>
+          <div className="flex flex-col items-center gap-1">
+            <span className={cn('text-sm font-bold', m2.text)}>{capitalize(game.team2)}</span>
+            <div className="flex items-center gap-2">
+              <button className="h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-lg font-bold" onClick={() => adj(setS2, -1)}>−</button>
+              <span className="w-8 text-center text-2xl font-bold text-slate-800">{s2}</span>
+              <button className="h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-lg font-bold" onClick={() => adj(setS2, 1)}>+</button>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button className="flex-1" onClick={submit} disabled={saving}>
+            {saving ? '…' : 'Save'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function SessionHistory({ sessions }: { sessions: Session[] }) {
   const [open, setOpen] = useState(false)
   if (sessions.length === 0) return null
@@ -98,8 +154,9 @@ function SessionHistory({ sessions }: { sessions: Session[] }) {
   )
 }
 
-export function GamesTab({ activeSession, sessions, players, onRecordGame, onRefresh, onNewSession }: Props) {
+export function GamesTab({ activeSession, sessions, players, onRecordGame, onUpdateGame, onRefresh, onNewSession }: Props) {
   const [activeMatchup, setActiveMatchup] = useState<[string, string] | null>(null)
+  const [editingGame, setEditingGame] = useState<Game | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
   const handleRefresh = async () => {
@@ -216,11 +273,25 @@ export function GamesTab({ activeSession, sessions, players, onRecordGame, onRef
                   <span className="text-sm font-bold text-slate-800">{g.score1} – {g.score2}</span>
                   <span className={cn('text-sm font-bold', m2.text)}>{capitalize(g.team2)}</span>
                   <span className="text-xs text-slate-400 ml-auto">{formatDate(g.played_at)}</span>
+                  <button
+                    className="p-1 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors ml-1"
+                    onClick={() => setEditingGame(g)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
                 </div>
               )
             })}
           </Card>
         </div>
+      )}
+
+      {editingGame && (
+        <EditGameDialog
+          game={editingGame}
+          onSave={(s1, s2) => onUpdateGame(editingGame.id, s1, s2)}
+          onClose={() => setEditingGame(null)}
+        />
       )}
 
       <SessionHistory sessions={sessions.filter((s) => s.id !== activeSession.id)} />

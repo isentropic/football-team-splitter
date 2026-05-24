@@ -74,6 +74,14 @@ export async function fetchStats(): Promise<StatsResponse> {
   return handle<StatsResponse>(await fetch('/api/stats'))
 }
 
+export async function updateGame(id: string, score1: number, score2: number): Promise<Game> {
+  return handle<Game>(await fetch(`/api/games/${id}`, {
+    method: 'PATCH',
+    headers: { ...JSON_HEADERS, ...authHeaders() },
+    body: JSON.stringify({ score1, score2 }),
+  }))
+}
+
 export async function recordGame(
   sessionId: string,
   game: Pick<Game, 'team1' | 'score1' | 'team2' | 'score2'>

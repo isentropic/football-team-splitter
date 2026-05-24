@@ -28,7 +28,7 @@ export default function App() {
   const [selected, setSelected] = useState<string[]>([])
   const [variants, setVariants] = useState<SplitVariant[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
-  const [activeTab, setActiveTab] = useState<Tab>('select')
+  const [activeTab, setActiveTab] = useState<Tab>('stats')
   const [activeSession, setActiveSession] = useState<(Session & { games: Game[] }) | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
 
@@ -47,10 +47,6 @@ export default function App() {
       }
     }).catch(console.error)
   }, [loggedIn])
-
-  if (!loggedIn) {
-    return <LoginScreen onLogin={() => setLoggedIn(true)} />
-  }
 
   const handleAdd = async (data: Omit<Player, 'id'>) => {
     const player = await api.createPlayer(data)
@@ -118,9 +114,18 @@ export default function App() {
     setActiveSession((prev) => prev ? { ...prev, games: [...prev.games, recorded] } : prev)
   }
 
+  const handleUpdateGame = async (id: string, score1: number, score2: number) => {
+    const updated = await api.updateGame(id, score1, score2)
+    setActiveSession((prev) => prev
+      ? { ...prev, games: prev.games.map((g) => g.id === id ? updated : g) }
+      : prev
+    )
+  }
+
   const handleLogout = () => {
     clearToken()
     setLoggedIn(false)
+    setActiveTab('stats')
   }
 
   return (
@@ -131,21 +136,36 @@ export default function App() {
           <div className="flex-1">
             <h1 className="text-lg font-bold leading-tight">Team Splitter</h1>
             <p className="text-emerald-200 text-xs">
-              {playersLoading ? 'Loading…' : `${players.length} players in roster`}
+              {loggedIn
+                ? (playersLoading ? 'Loading…' : `${players.length} players in roster`)
+                : 'Viewing stats'}
             </p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="p-2 rounded-xl hover:bg-emerald-700 transition-colors text-emerald-200 hover:text-white"
-            title="Sign out"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
+          {loggedIn ? (
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-xl hover:bg-emerald-700 transition-colors text-emerald-200 hover:text-white"
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              onClick={() => setActiveTab('select')}
+              className="text-xs text-emerald-200 hover:text-white px-2 py-1 rounded-lg hover:bg-emerald-700 transition-colors"
+            >
+              Admin login
+            </button>
+          )}
         </div>
       </header>
 
       <main className="flex-1 px-4 py-4 pb-24 overflow-y-auto">
-        {playersLoading ? (
+        {activeTab === 'stats' && <StatsTab />}
+        {activeTab !== 'stats' && !loggedIn && (
+          <LoginScreen onLogin={() => { setLoggedIn(true) }} />
+        )}
+        {activeTab !== 'stats' && loggedIn && (playersLoading ? (
           <div className="flex justify-center py-20">
             <div className="h-10 w-10 rounded-full border-4 border-emerald-200 border-t-emerald-600 animate-spin" />
           </div>
@@ -169,13 +189,13 @@ export default function App() {
                 onLockTeams={handleLockTeams}
               />
             )}
-            {activeTab === 'stats' && <StatsTab />}
             {activeTab === 'games' && (
               <GamesTab
                 activeSession={activeSession}
                 sessions={sessions}
                 players={players}
                 onRecordGame={handleRecordGame}
+                onUpdateGame={handleUpdateGame}
                 onRefresh={handleRefreshSession}
                 onNewSession={() => setActiveTab('select')}
               />
@@ -190,7 +210,7 @@ export default function App() {
               />
             )}
           </>
-        )}
+        ))}
       </main>
 
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white border-t border-slate-200 shadow-lg">

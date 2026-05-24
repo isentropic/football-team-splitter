@@ -88,6 +88,13 @@ function PlayerLeaderboard({ players }: { players: PlayerStat[] }) {
   )
 }
 
+const TEAM_BG: Record<string, string> = {
+  orange: 'bg-orange-500',
+  blue:   'bg-blue-500',
+  green:  'bg-emerald-500',
+}
+const teamBg = (c: string) => TEAM_BG[c] ?? 'bg-slate-400'
+
 function RecentGames({ games }: { games: Game[] }) {
   if (games.length === 0) return null
   return (
@@ -97,16 +104,30 @@ function RecentGames({ games }: { games: Game[] }) {
         {games.map((g) => {
           const t1won = g.score1 > g.score2
           const t2won = g.score2 > g.score1
+          const isDraw = g.score1 === g.score2
           return (
-            <div key={g.id} className="flex items-center px-4 py-2.5 gap-3">
-              <span className={cn('text-sm font-bold w-14', teamText(g.team1), t1won && 'underline decoration-dotted')}>
-                {capitalize(g.team1)}
-              </span>
-              <span className="text-sm font-bold text-slate-800 tabular-nums">{g.score1}–{g.score2}</span>
-              <span className={cn('text-sm font-bold w-14', teamText(g.team2), t2won && 'underline decoration-dotted')}>
-                {capitalize(g.team2)}
-              </span>
-              <span className="text-xs text-slate-400 ml-auto">{formatDate(g.played_at)}</span>
+            <div key={g.id} className="flex items-center px-4 py-2.5 gap-2">
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                <div className={cn('h-2.5 w-2.5 rounded-full shrink-0', teamBg(g.team1))} />
+                <span className={cn('text-sm font-semibold truncate', teamText(g.team1), t1won && 'font-bold')}>
+                  {capitalize(g.team1)}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className={cn('text-base font-bold tabular-nums w-5 text-right', t1won ? 'text-slate-900' : 'text-slate-400')}>{g.score1}</span>
+                <span className="text-slate-300 text-sm">–</span>
+                <span className={cn('text-base font-bold tabular-nums w-5', t2won ? 'text-slate-900' : 'text-slate-400')}>{g.score2}</span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+                <span className={cn('text-sm font-semibold truncate', teamText(g.team2), t2won && 'font-bold')}>
+                  {capitalize(g.team2)}
+                </span>
+                <div className={cn('h-2.5 w-2.5 rounded-full shrink-0', teamBg(g.team2))} />
+              </div>
+              <div className="flex flex-col items-end ml-2 shrink-0">
+                <span className="text-xs text-slate-400">{formatDate(g.played_at)}</span>
+                {isDraw && <span className="text-[10px] text-slate-400">draw</span>}
+              </div>
             </div>
           )
         })}
