@@ -1,5 +1,18 @@
 import { requireAdmin, type Env } from '../../_lib/db'
 
+export const onRequestDelete: PagesFunction<Env> = async (ctx) => {
+  const denied = await requireAdmin(ctx.request, ctx.env)
+  if (denied) return denied
+
+  const id = ctx.params.id as string
+  const { meta } = await ctx.env.DB
+    .prepare('DELETE FROM games WHERE id = ?')
+    .bind(id)
+    .run()
+  if (meta.changes === 0) return Response.json({ error: 'Not found' }, { status: 404 })
+  return new Response(null, { status: 204 })
+}
+
 export const onRequestPatch: PagesFunction<Env> = async (ctx) => {
   const denied = await requireAdmin(ctx.request, ctx.env)
   if (denied) return denied

@@ -139,7 +139,7 @@ export function SplitTab({ variants, isLoading, onRegenerate, hasSelection, onLo
         <div className="h-16 w-16 rounded-2xl bg-slate-100 flex items-center justify-center">
           <Trophy className="h-8 w-8 text-slate-300" />
         </div>
-        <p className="text-slate-500 text-sm">Select 15 players in the first tab to generate teams.</p>
+        <p className="text-slate-500 text-sm">Select at least 6 players to generate teams.</p>
       </div>
     )
   }

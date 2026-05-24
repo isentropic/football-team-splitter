@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Swords, ChevronDown, ChevronUp, Plus, RefreshCw, Pencil } from 'lucide-react'
+import { Swords, ChevronDown, ChevronUp, Plus, RefreshCw, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -12,6 +12,7 @@ interface Props {
   players: Player[]
   onRecordGame: (sessionId: string, game: Pick<Game, 'team1' | 'score1' | 'team2' | 'score2'>) => Promise<void>
   onUpdateGame: (id: string, score1: number, score2: number) => Promise<void>
+  onDeleteGame: (id: string) => Promise<void>
   onRefresh: () => Promise<void>
   onNewSession: () => void
 }
@@ -154,9 +155,10 @@ function SessionHistory({ sessions }: { sessions: Session[] }) {
   )
 }
 
-export function GamesTab({ activeSession, sessions, players, onRecordGame, onUpdateGame, onRefresh, onNewSession }: Props) {
+export function GamesTab({ activeSession, sessions, players, onRecordGame, onUpdateGame, onDeleteGame, onRefresh, onNewSession }: Props) {
   const [activeMatchup, setActiveMatchup] = useState<[string, string] | null>(null)
   const [editingGame, setEditingGame] = useState<Game | null>(null)
+  const [deletingGameId, setDeletingGameId] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
   const handleRefresh = async () => {
@@ -172,7 +174,7 @@ export function GamesTab({ activeSession, sessions, players, onRecordGame, onUpd
         </div>
         <p className="text-slate-500 text-sm">No active session. Select players, generate teams, then lock them in.</p>
         <Button variant="outline" size="sm" onClick={onNewSession}>
-          <Plus className="h-4 w-4 mr-1" />Go to Select tab
+          <Plus className="h-4 w-4 mr-1" />New session
         </Button>
         <SessionHistory sessions={sessions} />
       </div>
@@ -279,6 +281,21 @@ export function GamesTab({ activeSession, sessions, players, onRecordGame, onUpd
                   >
                     <Pencil className="h-3 w-3" />
                   </button>
+                  {deletingGameId === g.id ? (
+                    <button
+                      className="p-1 rounded-lg text-red-500 hover:bg-red-50 transition-colors ml-1 text-xs font-semibold"
+                      onClick={async () => { await onDeleteGame(g.id); setDeletingGameId(null) }}
+                    >
+                      Sure?
+                    </button>
+                  ) : (
+                    <button
+                      className="p-1 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors ml-1"
+                      onClick={() => setDeletingGameId(g.id)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  )}
                 </div>
               )
             })}

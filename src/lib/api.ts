@@ -70,8 +70,16 @@ export async function deleteSession(id: string): Promise<void> {
   }))
 }
 
-export async function fetchStats(): Promise<StatsResponse> {
-  return handle<StatsResponse>(await fetch('/api/stats'))
+export async function fetchStats(month?: string): Promise<StatsResponse> {
+  const url = month ? `/api/stats?month=${month}` : '/api/stats'
+  return handle<StatsResponse>(await fetch(url))
+}
+
+export async function deleteGame(id: string): Promise<void> {
+  return handle<void>(await fetch(`/api/games/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  }))
 }
 
 export async function updateGame(id: string, score1: number, score2: number): Promise<Game> {

@@ -7,7 +7,7 @@ interface Props {
   players: Player[]
   selected: string[]
   onChange: (ids: string[]) => void
-  max?: number
+  max?: number  // optional hard cap; when omitted, no limit
 }
 
 const avatarColors = [
@@ -16,7 +16,7 @@ const avatarColors = [
 ]
 const colorFor = (name: string) => avatarColors[name.charCodeAt(0) % avatarColors.length]
 
-export function PlayerSelect({ players, selected, onChange, max = 15 }: Props) {
+export function PlayerSelect({ players, selected, onChange, max }: Props) {
   const [query, setQuery] = useState('')
 
   const filtered = players.filter((p) =>
@@ -26,7 +26,7 @@ export function PlayerSelect({ players, selected, onChange, max = 15 }: Props) {
   const toggle = (id: string) => {
     if (selected.includes(id)) {
       onChange(selected.filter((s) => s !== id))
-    } else if (selected.length < max) {
+    } else if (max === undefined || selected.length < max) {
       onChange([...selected, id])
     }
   }
@@ -51,7 +51,7 @@ export function PlayerSelect({ players, selected, onChange, max = 15 }: Props) {
       </div>
 
       <div className="flex items-center justify-between text-sm text-slate-500">
-        <span>{selected.length}/{max} selected</span>
+        <span>{selected.length}{max !== undefined ? `/${max}` : ''} selected</span>
         {selected.length > 0 && (
           <button className="text-emerald-600 font-medium hover:underline" onClick={() => onChange([])}>
             Clear all
@@ -65,7 +65,7 @@ export function PlayerSelect({ players, selected, onChange, max = 15 }: Props) {
         )}
         {filtered.map((player) => {
           const isSelected = selected.includes(player.id)
-          const isFull = selected.length >= max && !isSelected
+          const isFull = max !== undefined && selected.length >= max && !isSelected
           return (
             <button
               key={player.id}

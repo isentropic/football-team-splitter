@@ -34,10 +34,10 @@ function buildTeamStats(players: Player[], def: { name: string; color: string })
 }
 
 // Sum of squared differences of per-stat averages across teams (lower = better)
-function computeScore(sums: number[][], size: number): number {
+function computeScore(sums: number[][], sizes: number[]): number {
   let total = 0
   for (let s = 0; s < 7; s++) {
-    const avgs = sums.map((t) => t[s] / size)
+    const avgs = sums.map((t, ti) => t[s] / sizes[ti])
     const mean = avgs.reduce((a, b) => a + b, 0) / 3
     for (const v of avgs) total += (v - mean) ** 2
   }
@@ -62,10 +62,13 @@ function snakeDraftInit(players: Player[]): number[][] {
 
 function runSA(players: Player[]): { assignment: number[]; score: number } {
   const n = players.length
-  const teamSize = n / 3
 
   // assignment[playerIdx] = teamIdx (0,1,2)
   const assignment: number[] = snakeDraftInit(players) as unknown as number[]
+
+  // Compute actual team sizes (may be unequal when n % 3 !== 0)
+  const teamSizes = [0, 0, 0]
+  for (const t of assignment) teamSizes[t]++
 
   // Precompute stat sums per team
   const sums: number[][] = [[0,0,0,0,0,0,0],[0,0,0,0,0,0,0],[0,0,0,0,0,0,0]]
@@ -74,7 +77,8 @@ function runSA(players: Player[]): { assignment: number[]; score: number } {
     for (let s = 0; s < 7; s++) sums[t][s] += players[i][STAT_KEYS[s]]
   }
 
-  let score = computeScore(sums, teamSize)
+  // teamSizes never change during SA (swaps exchange players between teams)
+  let score = computeScore(sums, teamSizes)
 
   const T_START = 2.0
   const T_END = 0.01
@@ -102,7 +106,7 @@ function runSA(players: Player[]): { assignment: number[]; score: number } {
       sums[tj][s] -= players[j][STAT_KEYS[s]]
       sums[tj][s] += players[i][STAT_KEYS[s]]
     }
-    const newScore = computeScore(sums, teamSize)
+    const newScore = computeScore(sums, teamSizes)
     const delta = newScore - score
 
     if (delta < 0 || Math.random() < Math.exp(-delta / T)) {
@@ -140,8 +144,8 @@ function assembleVariant(players: Player[], assignment: number[], score: number,
 export const onRequestPost: PagesFunction = async (ctx) => {
   try {
     const { players } = await ctx.request.json() as { players: Player[] }
-    if (!Array.isArray(players) || players.length !== 15) {
-      return Response.json({ error: 'Expected exactly 15 players' }, { status: 400 })
+    if (!Array.isArray(players) || players.length < 6) {
+      return Response.json({ error: 'Need at least 6 players' }, { status: 400 })
     }
 
     const runs = [runSA(players), runSA(players), runSA(players)]

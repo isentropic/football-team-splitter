@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Users, Trophy, Swords, BarChart2, Settings, LogOut } from 'lucide-react'
-import { SelectionTab } from '@/tabs/SelectionTab'
-import { SplitTab } from '@/tabs/SplitTab'
+import { Trophy, Swords, BarChart2, Settings, LogOut } from 'lucide-react'
+import { TeamsTab } from '@/tabs/TeamsTab'
 import { GamesTab } from '@/tabs/GamesTab'
 import { StatsTab } from '@/tabs/StatsTab'
 import { ManageTab } from '@/tabs/ManageTab'
@@ -11,11 +10,10 @@ import { isLoggedIn, clearToken } from '@/lib/auth'
 import * as api from '@/lib/api'
 import type { Player, SplitVariant, Session, Game } from '@/lib/types'
 
-type Tab = 'select' | 'split' | 'games' | 'stats' | 'manage'
+type Tab = 'teams' | 'games' | 'stats' | 'manage'
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: 'select', label: 'Select',  icon: Users     },
-  { id: 'split',  label: 'Teams',   icon: Trophy    },
+  { id: 'teams',  label: 'Teams',   icon: Trophy    },
   { id: 'games',  label: 'Games',   icon: Swords    },
   { id: 'stats',  label: 'Stats',   icon: BarChart2 },
   { id: 'manage', label: 'Players', icon: Settings  },
@@ -72,7 +70,6 @@ export default function App() {
   const handleGenerate = async () => {
     const selectedPlayers = players.filter((p) => selected.includes(p.id))
     setIsGenerating(true)
-    setActiveTab('split')
     try {
       const res = await fetch('/api/split', {
         method: 'POST',
@@ -122,6 +119,14 @@ export default function App() {
     )
   }
 
+  const handleDeleteGame = async (id: string) => {
+    await api.deleteGame(id)
+    setActiveSession((prev) => prev
+      ? { ...prev, games: prev.games.filter((g) => g.id !== id) }
+      : prev
+    )
+  }
+
   const handleLogout = () => {
     clearToken()
     setLoggedIn(false)
@@ -151,7 +156,7 @@ export default function App() {
             </button>
           ) : (
             <button
-              onClick={() => setActiveTab('select')}
+              onClick={() => setActiveTab('teams')}
               className="text-xs text-emerald-200 hover:text-white px-2 py-1 rounded-lg hover:bg-emerald-700 transition-colors"
             >
               Admin login
@@ -161,7 +166,7 @@ export default function App() {
       </header>
 
       <main className="flex-1 px-4 py-4 pb-24 overflow-y-auto">
-        {activeTab === 'stats' && <StatsTab />}
+        {activeTab === 'stats' && <StatsTab loggedIn={loggedIn} />}
         {activeTab !== 'stats' && !loggedIn && (
           <LoginScreen onLogin={() => { setLoggedIn(true) }} />
         )}
@@ -171,21 +176,14 @@ export default function App() {
           </div>
         ) : (
           <>
-            {activeTab === 'select' && (
-              <SelectionTab
+            {activeTab === 'teams' && (
+              <TeamsTab
                 players={players}
                 selected={selected}
                 onSelectionChange={setSelected}
-                onGenerate={handleGenerate}
-                isLoading={isGenerating}
-              />
-            )}
-            {activeTab === 'split' && (
-              <SplitTab
                 variants={variants}
-                isLoading={isGenerating}
-                onRegenerate={handleGenerate}
-                hasSelection={selected.length === 15}
+                isGenerating={isGenerating}
+                onGenerate={handleGenerate}
                 onLockTeams={handleLockTeams}
               />
             )}
@@ -196,8 +194,9 @@ export default function App() {
                 players={players}
                 onRecordGame={handleRecordGame}
                 onUpdateGame={handleUpdateGame}
+                onDeleteGame={handleDeleteGame}
                 onRefresh={handleRefreshSession}
-                onNewSession={() => setActiveTab('select')}
+                onNewSession={() => setActiveTab('teams')}
               />
             )}
             {activeTab === 'manage' && (

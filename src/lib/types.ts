@@ -57,9 +57,16 @@ export interface PlayerStat {
   wins: number
   draws: number
   losses: number
+  pts: number
+}
+
+export interface EnrichedGame extends Game {
+  team1Players: string[]
+  team2Players: string[]
 }
 
 export interface StatsResponse {
   players: PlayerStat[]
-  recent_games: Game[]
+  recent_games: EnrichedGame[]
+  available_months: string[]  // "YYYY-MM" sorted ascending
 }
