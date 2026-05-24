@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Users, Trophy, Swords, Settings, LogOut } from 'lucide-react'
+import { Users, Trophy, Swords, BarChart2, Settings, LogOut } from 'lucide-react'
 import { SelectionTab } from '@/tabs/SelectionTab'
 import { SplitTab } from '@/tabs/SplitTab'
 import { GamesTab } from '@/tabs/GamesTab'
+import { StatsTab } from '@/tabs/StatsTab'
 import { ManageTab } from '@/tabs/ManageTab'
 import { LoginScreen } from '@/components/LoginScreen'
 import { cn } from '@/lib/utils'
@@ -10,12 +11,13 @@ import { isLoggedIn, clearToken } from '@/lib/auth'
 import * as api from '@/lib/api'
 import type { Player, SplitVariant, Session, Game } from '@/lib/types'
 
-type Tab = 'select' | 'split' | 'games' | 'manage'
+type Tab = 'select' | 'split' | 'games' | 'stats' | 'manage'
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'select', label: 'Select',  icon: Users     },
   { id: 'split',  label: 'Teams',   icon: Trophy    },
   { id: 'games',  label: 'Games',   icon: Swords    },
+  { id: 'stats',  label: 'Stats',   icon: BarChart2 },
   { id: 'manage', label: 'Players', icon: Settings  },
 ]
 
@@ -167,6 +169,7 @@ export default function App() {
                 onLockTeams={handleLockTeams}
               />
             )}
+            {activeTab === 'stats' && <StatsTab />}
             {activeTab === 'games' && (
               <GamesTab
                 activeSession={activeSession}

@@ -1,4 +1,4 @@
-import type { Player, Session, Game } from './types'
+import type { Player, Session, Game, StatsResponse } from './types'
 import { authHeaders } from './auth'
 
 async function handle<T>(res: Response): Promise<T> {
@@ -68,6 +68,10 @@ export async function deleteSession(id: string): Promise<void> {
     method: 'DELETE',
     headers: authHeaders(),
   }))
+}
+
+export async function fetchStats(): Promise<StatsResponse> {
+  return handle<StatsResponse>(await fetch('/api/stats'))
 }
 
 export async function recordGame(

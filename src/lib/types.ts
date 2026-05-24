@@ -49,3 +49,17 @@ export interface Game {
   score2: number
   played_at: number
 }
+
+export interface PlayerStat {
+  id: string
+  name: string
+  games_played: number
+  wins: number
+  draws: number
+  losses: number
+}
+
+export interface StatsResponse {
+  players: PlayerStat[]
+  recent_games: Game[]
+}
