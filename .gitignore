@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 .wrangler/
 .dev.vars
+
+# Local data — already seeded to D1, never commit
+*.csv
+seed.sql
