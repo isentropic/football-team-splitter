@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Swords, ChevronDown, ChevronUp, Plus } from 'lucide-react'
+import { Swords, ChevronDown, ChevronUp, Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { cn, initials } from '@/lib/utils'
@@ -10,6 +10,7 @@ interface Props {
   sessions: Session[]
   players: Player[]
   onRecordGame: (sessionId: string, game: Pick<Game, 'team1' | 'score1' | 'team2' | 'score2'>) => Promise<void>
+  onRefresh: () => Promise<void>
   onNewSession: () => void
 }
 
@@ -97,8 +98,14 @@ function SessionHistory({ sessions }: { sessions: Session[] }) {
   )
 }
 
-export function GamesTab({ activeSession, sessions, players, onRecordGame, onNewSession }: Props) {
+export function GamesTab({ activeSession, sessions, players, onRecordGame, onRefresh, onNewSession }: Props) {
   const [activeMatchup, setActiveMatchup] = useState<[string, string] | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try { await onRefresh() } finally { setRefreshing(false) }
+  }
 
   if (!activeSession) {
     return (
@@ -125,7 +132,17 @@ export function GamesTab({ activeSession, sessions, players, onRecordGame, onNew
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <p className="text-xs text-slate-400 mb-2">{formatDate(activeSession.played_at)}</p>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs text-slate-400">{formatDate(activeSession.played_at)}</p>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-1 text-xs text-slate-400 hover:text-emerald-600 transition-colors"
+          >
+            <RefreshCw className={cn('h-3 w-3', refreshing && 'animate-spin')} />
+            Refresh
+          </button>
+        </div>
         <div className="flex flex-col gap-2">
           {activeSession.teams.map((t) => {
             const m = teamMeta(t.color)

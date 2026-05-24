@@ -21,8 +21,6 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'manage', label: 'Players', icon: Settings  },
 ]
 
-const ACTIVE_SESSION_KEY = 'fts-active-session'
-
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(isLoggedIn)
   const [players, setPlayers] = useState<Player[]>([])
@@ -41,16 +39,13 @@ export default function App() {
       .catch(console.error)
       .finally(() => setPlayersLoading(false))
 
-    api.fetchSessions()
-      .then(setSessions)
-      .catch(console.error)
-
-    const savedId = localStorage.getItem(ACTIVE_SESSION_KEY)
-    if (savedId) {
-      api.fetchSession(savedId)
-        .then(setActiveSession)
-        .catch(() => localStorage.removeItem(ACTIVE_SESSION_KEY))
-    }
+    api.fetchSessions().then(async (all) => {
+      setSessions(all)
+      if (all.length > 0) {
+        const full = await api.fetchSession(all[0].id)
+        setActiveSession(full)
+      }
+    }).catch(console.error)
   }, [loggedIn])
 
   if (!loggedIn) {
@@ -106,8 +101,13 @@ export default function App() {
     const full = await api.fetchSession(session.id)
     setActiveSession(full)
     setSessions((prev) => [session, ...prev])
-    localStorage.setItem(ACTIVE_SESSION_KEY, session.id)
     setActiveTab('games')
+  }
+
+  const handleRefreshSession = async () => {
+    if (!activeSession) return
+    const full = await api.fetchSession(activeSession.id)
+    setActiveSession(full)
   }
 
   const handleRecordGame = async (
@@ -176,6 +176,7 @@ export default function App() {
                 sessions={sessions}
                 players={players}
                 onRecordGame={handleRecordGame}
+                onRefresh={handleRefreshSession}
                 onNewSession={() => setActiveTab('select')}
               />
             )}
