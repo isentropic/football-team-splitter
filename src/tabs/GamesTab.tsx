@@ -14,6 +14,7 @@ interface Props {
   onUpdateGame: (id: string, score1: number, score2: number) => Promise<void>
   onDeleteGame: (id: string) => Promise<void>
   onRefresh: () => Promise<void>
+  onEndSession: () => void
   onNewSession: () => void
 }
 
@@ -155,11 +156,12 @@ function SessionHistory({ sessions }: { sessions: Session[] }) {
   )
 }
 
-export function GamesTab({ activeSession, sessions, players, onRecordGame, onUpdateGame, onDeleteGame, onRefresh, onNewSession }: Props) {
+export function GamesTab({ activeSession, sessions, players, onRecordGame, onUpdateGame, onDeleteGame, onRefresh, onEndSession, onNewSession }: Props) {
   const [activeMatchup, setActiveMatchup] = useState<[string, string] | null>(null)
   const [editingGame, setEditingGame] = useState<Game | null>(null)
   const [deletingGameId, setDeletingGameId] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [endingSession, setEndingSession] = useState(false)
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -310,6 +312,30 @@ export function GamesTab({ activeSession, sessions, players, onRecordGame, onUpd
           onClose={() => setEditingGame(null)}
         />
       )}
+
+      <div className="pt-2 border-t border-slate-100">
+        {endingSession ? (
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-slate-500 flex-1">Done recording for this session?</p>
+            <button
+              onClick={() => setEndingSession(false)}
+              className="text-xs text-slate-400 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <Button variant="destructive" size="sm" onClick={onEndSession}>
+              End session
+            </Button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setEndingSession(true)}
+            className="w-full text-xs text-slate-400 hover:text-red-500 py-2 transition-colors"
+          >
+            End session
+          </button>
+        )}
+      </div>
 
       <SessionHistory sessions={sessions.filter((s) => s.id !== activeSession.id)} />
     </div>

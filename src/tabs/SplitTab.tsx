@@ -12,6 +12,7 @@ interface Props {
   onRegenerate: () => void
   hasSelection: boolean
   onLockTeams: (variant: SplitVariant) => void
+  hasActiveSession?: boolean
 }
 
 const TEAM_COLORS: Record<string, { bg: string; light: string; text: string; border: string }> = {
@@ -43,11 +44,12 @@ function StatBar({ label, value }: { label: string; value: number }) {
   )
 }
 
-function VariantCard({ variant, index, defaultOpen, onUseTeams }: {
+function VariantCard({ variant, index, defaultOpen, onUseTeams, hasActiveSession }: {
   variant: SplitVariant
   index: number
   defaultOpen: boolean
   onUseTeams: (v: SplitVariant) => void
+  hasActiveSession?: boolean
 }) {
   const [expanded, setExpanded] = useState(defaultOpen)
   const [adjusting, setAdjusting] = useState(false)
@@ -74,10 +76,15 @@ function VariantCard({ variant, index, defaultOpen, onUseTeams }: {
         <div className="flex items-center gap-2">
           {!adjusting && (
             <span
-              className="text-xs text-emerald-600 font-medium px-2 py-0.5 rounded-full border border-emerald-200 hover:bg-emerald-50"
-              onClick={handleUse}
+              className={cn(
+                'text-xs font-medium px-2 py-0.5 rounded-full border',
+                hasActiveSession
+                  ? 'text-slate-400 border-slate-200 cursor-not-allowed'
+                  : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50 cursor-pointer'
+              )}
+              onClick={hasActiveSession ? undefined : handleUse}
             >
-              Use these teams
+              {hasActiveSession ? 'Session active' : 'Use these teams'}
             </span>
           )}
           {expanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
@@ -113,8 +120,8 @@ function VariantCard({ variant, index, defaultOpen, onUseTeams }: {
               </div>
             )
           })}
-          <Button size="sm" className="w-full mt-1" onClick={handleUse}>
-            Use these teams
+          <Button size="sm" className="w-full mt-1" onClick={handleUse} disabled={hasActiveSession}>
+            {hasActiveSession ? 'End active session first' : 'Use these teams'}
           </Button>
         </div>
       )}
@@ -132,7 +139,7 @@ function VariantCard({ variant, index, defaultOpen, onUseTeams }: {
   )
 }
 
-export function SplitTab({ variants, isLoading, onRegenerate, hasSelection, onLockTeams }: Props) {
+export function SplitTab({ variants, isLoading, onRegenerate, hasSelection, onLockTeams, hasActiveSession }: Props) {
   if (!hasSelection) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
@@ -171,7 +178,7 @@ export function SplitTab({ variants, isLoading, onRegenerate, hasSelection, onLo
         </Button>
       </div>
       {variants.map((v, i) => (
-        <VariantCard key={v.id} variant={v} index={i} defaultOpen={i === 0} onUseTeams={onLockTeams} />
+        <VariantCard key={v.id} variant={v} index={i} defaultOpen={i === 0} onUseTeams={onLockTeams} hasActiveSession={hasActiveSession} />
       ))}
     </div>
   )

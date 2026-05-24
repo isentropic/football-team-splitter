@@ -10,6 +10,8 @@ import { isLoggedIn, clearToken } from '@/lib/auth'
 import * as api from '@/lib/api'
 import type { Player, SplitVariant, Session, Game } from '@/lib/types'
 
+const ACTIVE_SESSION_KEY = 'fts-active-session'
+
 type Tab = 'teams' | 'games' | 'stats' | 'manage'
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
@@ -37,13 +39,22 @@ export default function App() {
       .catch(console.error)
       .finally(() => setPlayersLoading(false))
 
-    api.fetchSessions().then(async (all) => {
-      setSessions(all)
-      if (all.length > 0) {
-        const full = await api.fetchSession(all[0].id)
-        setActiveSession(full)
-      }
-    }).catch(console.error)
+    api.fetchSessions().then(setSessions).catch(console.error)
+
+    const savedId = localStorage.getItem(ACTIVE_SESSION_KEY)
+    if (savedId) {
+      api.fetchSession(savedId)
+        .then((session) => {
+          if (session.games.length === 0) {
+            api.deleteSession(session.id).catch(console.error)
+            setSessions((prev) => prev.filter((s) => s.id !== session.id))
+            localStorage.removeItem(ACTIVE_SESSION_KEY)
+          } else {
+            setActiveSession(session)
+          }
+        })
+        .catch(() => localStorage.removeItem(ACTIVE_SESSION_KEY))
+    }
   }, [loggedIn])
 
   const handleAdd = async (data: Omit<Player, 'id'>) => {
@@ -92,6 +103,7 @@ export default function App() {
     }))
     const session = await api.createSession(teams)
     const full = await api.fetchSession(session.id)
+    localStorage.setItem(ACTIVE_SESSION_KEY, session.id)
     setActiveSession(full)
     setSessions((prev) => [session, ...prev])
     setActiveTab('games')
@@ -101,6 +113,15 @@ export default function App() {
     if (!activeSession) return
     const full = await api.fetchSession(activeSession.id)
     setActiveSession(full)
+  }
+
+  const handleEndSession = () => {
+    if (activeSession?.games.length === 0) {
+      api.deleteSession(activeSession.id).catch(console.error)
+      setSessions((prev) => prev.filter((s) => s.id !== activeSession.id))
+    }
+    localStorage.removeItem(ACTIVE_SESSION_KEY)
+    setActiveSession(null)
   }
 
   const handleRecordGame = async (
@@ -165,7 +186,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 px-4 py-4 pb-24 overflow-y-auto">
+      <main className={cn('flex-1 px-4 py-4 overflow-y-auto', loggedIn && 'pb-24')}>
         {activeTab === 'stats' && <StatsTab loggedIn={loggedIn} />}
         {activeTab !== 'stats' && !loggedIn && (
           <LoginScreen onLogin={() => { setLoggedIn(true) }} />
@@ -185,6 +206,7 @@ export default function App() {
                 isGenerating={isGenerating}
                 onGenerate={handleGenerate}
                 onLockTeams={handleLockTeams}
+                hasActiveSession={activeSession !== null}
               />
             )}
             {activeTab === 'games' && (
@@ -196,6 +218,7 @@ export default function App() {
                 onUpdateGame={handleUpdateGame}
                 onDeleteGame={handleDeleteGame}
                 onRefresh={handleRefreshSession}
+                onEndSession={handleEndSession}
                 onNewSession={() => setActiveTab('teams')}
               />
             )}
@@ -212,7 +235,7 @@ export default function App() {
         ))}
       </main>
 
-      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white border-t border-slate-200 shadow-lg">
+      {loggedIn && <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white border-t border-slate-200 shadow-lg">
         <div className="flex">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
@@ -228,7 +251,7 @@ export default function App() {
             </button>
           ))}
         </div>
-      </nav>
+      </nav>}
     </div>
   )
 }

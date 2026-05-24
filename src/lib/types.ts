@@ -58,6 +58,7 @@ export interface PlayerStat {
   draws: number
   losses: number
   pts: number
+  recent_count?: number  // games in the recency window; only present in overall mode
 }
 
 export interface EnrichedGame extends Game {
@@ -69,4 +70,35 @@ export interface StatsResponse {
   players: PlayerStat[]
   recent_games: EnrichedGame[]
   available_months: string[]  // "YYYY-MM" sorted ascending
+}
+
+export interface SessionTeamStat {
+  color: string
+  playerNames: string[]
+  games: number
+  wins: number
+  draws: number
+  losses: number
+  gf: number
+  ga: number
+}
+
+export interface SessionGameRow {
+  id: string
+  team1: string
+  team2: string
+  score1: number
+  score2: number
+  played_at: number
+}
+
+export interface SessionStat {
+  id: string
+  played_at: number
+  teams: SessionTeamStat[]
+  games: SessionGameRow[]
+}
+
+export interface SessionStatsResponse {
+  sessions: SessionStat[]
 }

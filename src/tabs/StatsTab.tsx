@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
-import { BarChart2, Medal, Pencil, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { BarChart2, Medal, Pencil, ChevronLeft, ChevronRight, Layers } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { fetchStats, updateGame, deleteGame } from '@/lib/api'
-import type { PlayerStat, EnrichedGame } from '@/lib/types'
+import { fetchStats, fetchSessionStats, updateGame, deleteGame } from '@/lib/api'
+import type { PlayerStat, EnrichedGame, SessionStat, SessionGameRow } from '@/lib/types'
 
 const TEAM_TEXT: Record<string, string> = {
   orange: 'text-orange-600',
@@ -17,8 +17,14 @@ const TEAM_BG: Record<string, string> = {
   blue:   'bg-blue-500',
   green:  'bg-emerald-500',
 }
-const teamText = (c: string) => TEAM_TEXT[c] ?? 'text-slate-700'
-const teamBg   = (c: string) => TEAM_BG[c]   ?? 'bg-slate-400'
+const TEAM_LIGHT: Record<string, string> = {
+  orange: 'bg-orange-50',
+  blue:   'bg-blue-50',
+  green:  'bg-emerald-50',
+}
+const teamText  = (c: string) => TEAM_TEXT[c]  ?? 'text-slate-700'
+const teamBg    = (c: string) => TEAM_BG[c]    ?? 'bg-slate-400'
+const teamLight = (c: string) => TEAM_LIGHT[c] ?? 'bg-slate-50'
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 function formatDayLabel(ts: number) {
@@ -28,17 +34,6 @@ function formatDayLabel(ts: number) {
 function formatMonth(ym: string) {
   const [y, m] = ym.split('-')
   return new Date(Number(y), Number(m) - 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-}
-
-function groupByDay(games: EnrichedGame[]) {
-  const groups: { label: string; games: EnrichedGame[] }[] = []
-  for (const g of games) {
-    const label = formatDayLabel(g.played_at)
-    const last = groups[groups.length - 1]
-    if (last && last.label === label) last.games.push(g)
-    else groups.push({ label, games: [g] })
-  }
-  return groups
 }
 
 function WinBar({ wins, draws, losses }: { wins: number; draws: number; losses: number }) {
@@ -62,14 +57,29 @@ function MedalIcon({ rank }: { rank: number }) {
   return <span className="text-xs text-slate-400 w-4 text-center">{rank}</span>
 }
 
-const MIN_GAMES = 5
+const MIN_GAMES = 10
+const OVERALL_MIN = 50
 
-function PlayerLeaderboard({ players }: { players: PlayerStat[] }) {
-  const ranked = players.filter((p) => p.games_played >= MIN_GAMES)
-  const below = players.filter((p) => p.games_played > 0 && p.games_played < MIN_GAMES)
+const FAKE_CHARS = 'ABCDEFGHJKLMNPQRSTVWXZ'
+function fakeStr(id: string, offset: number) {
+  let h = offset
+  for (let i = 0; i < id.length; i++) h = (Math.imul(h + 7, 31) + id.charCodeAt(i)) >>> 0
+  return FAKE_CHARS[h % FAKE_CHARS.length] + FAKE_CHARS[(h >>> 5) % FAKE_CHARS.length]
+}
 
-  if (ranked.length === 0) {
-    return <p className="text-sm text-slate-400 text-center py-6">No games recorded this month.</p>
+function PlayerLeaderboard({ players, view }: { players: PlayerStat[]; view: 'overall' | 'monthly' }) {
+  const isOverall = view === 'overall'
+
+  const ranked = isOverall
+    ? players.filter((p) => (p.recent_count ?? 0) >= OVERALL_MIN)
+    : players.filter((p) => p.games_played >= MIN_GAMES)
+
+  const pending = isOverall
+    ? players.filter((p) => { const rc = p.recent_count ?? 0; return rc > 0 && rc < OVERALL_MIN })
+    : players.filter((p) => p.games_played > 0 && p.games_played < MIN_GAMES)
+
+  if (ranked.length === 0 && pending.length === 0) {
+    return <p className="text-sm text-slate-400 text-center py-6">No players qualify yet.</p>
   }
 
   return (
@@ -107,8 +117,39 @@ function PlayerLeaderboard({ players }: { players: PlayerStat[] }) {
           </div>
         )
       })}
-      {below.length > 0 && (
-        <p className="text-xs text-slate-400 px-3 pt-2 pb-1">{below.length} players need {MIN_GAMES}+ games to appear</p>
+      {isOverall && pending.length > 0 && (
+        <>
+          <div className="flex items-center gap-2 px-3 py-1.5 border-t border-dashed border-slate-200 bg-slate-50/60">
+            <div className="h-px flex-1 bg-slate-200" />
+            <span className="text-[10px] font-semibold text-slate-400 tracking-wide shrink-0">ALMOST THERE</span>
+            <div className="h-px flex-1 bg-slate-200" />
+          </div>
+          {pending.map((p) => {
+            const need = OVERALL_MIN - (p.recent_count ?? 0)
+            return (
+              <div
+                key={p.id}
+                className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-x-2 items-center px-3 py-2.5 border-b border-slate-50 last:border-0"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-slate-300 w-4 text-center text-base leading-none">·</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-500 truncate">{p.name}</p>
+                    <span className="text-[10px] font-medium text-amber-600">Need {need} more</span>
+                  </div>
+                </div>
+                <span className="w-7 text-center text-xs text-slate-500 blur-sm select-none">{fakeStr(p.id, 1)}</span>
+                <span className="w-5 text-center text-xs font-semibold text-emerald-600 blur-sm select-none">{fakeStr(p.id, 2)}</span>
+                <span className="w-5 text-center text-xs font-semibold text-amber-500 blur-sm select-none">{fakeStr(p.id, 3)}</span>
+                <span className="w-5 text-center text-xs font-semibold text-red-400 blur-sm select-none">{fakeStr(p.id, 4)}</span>
+                <span className="w-10 text-center text-xs font-bold text-slate-700 blur-sm select-none">{fakeStr(p.id, 5)}</span>
+              </div>
+            )
+          })}
+        </>
+      )}
+      {!isOverall && pending.length > 0 && (
+        <p className="text-xs text-slate-400 px-3 pt-2 pb-1">{pending.length} players need {MIN_GAMES}+ games to appear</p>
       )}
     </div>
   )
@@ -189,132 +230,255 @@ function EditGameDialog({ game, onSave, onDelete, onClose }: {
   )
 }
 
-function RecentGames({ games, loggedIn, onEdit }: {
-  games: EnrichedGame[]
+function SessionCard({
+  session,
+  loggedIn,
+  onEdit,
+}: {
+  session: SessionStat
   loggedIn: boolean
-  onEdit: (game: EnrichedGame) => void
+  onEdit: (g: SessionGameRow, sessionId: string) => void
 }) {
-  if (games.length === 0) return null
-  const groups = groupByDay(games)
+  const date = formatDayLabel(session.played_at)
+  const gameCount = session.games.length
 
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-sm font-semibold text-slate-700">Games</p>
-      <Card className="overflow-hidden">
-        {groups.map((group, gi) => (
-          <div key={group.label}>
-            {/* Day separator */}
-            <div className={cn('flex items-center gap-2 px-3 py-1.5', gi === 0 ? 'border-b border-slate-100' : 'border-y border-slate-100')}>
-              <div className="h-px flex-1 bg-slate-100" />
-              <span className="text-[10px] font-medium text-slate-400 shrink-0">{group.label}</span>
-              <div className="h-px flex-1 bg-slate-100" />
+    <Card className="overflow-hidden shrink-0">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50/60">
+        <span className="text-sm font-semibold text-slate-700">{date}</span>
+        <span className="text-xs text-slate-400">{gameCount} {gameCount === 1 ? 'game' : 'games'}</span>
+      </div>
+
+      {/* Teams */}
+      {session.teams.map((t) => {
+        const gd = t.gf - t.ga
+        const pts = t.wins * 3 + t.draws
+        return (
+          <div key={t.color} className={cn('px-4 py-3 border-b border-slate-100 last:border-0', teamLight(t.color) + '/40')}>
+            {/* Team header */}
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className={cn('h-2.5 w-2.5 rounded-full shrink-0', teamBg(t.color))} />
+              <span className={cn('text-sm font-semibold', teamText(t.color))}>{capitalize(t.color)}</span>
+              <span className="text-xs text-slate-400 ml-0.5">{t.playerNames.length}p</span>
             </div>
-            {group.games.map((g) => {
+
+            {/* Player names */}
+            <p className="text-[11px] text-slate-500 mb-2.5 leading-relaxed">
+              {t.playerNames.map((n) => n.split(' ')[0]).join(', ')}
+            </p>
+
+            {/* Raw stats row */}
+            <div className="grid grid-cols-7 text-center mb-0.5">
+              {(['GP','W','D','L','GF','GA','GD'] as const).map((h) => (
+                <span key={h} className={cn(
+                  'text-[9px] font-semibold',
+                  h === 'W' ? 'text-emerald-500' : h === 'D' ? 'text-amber-500' : h === 'L' ? 'text-red-400' : 'text-slate-400'
+                )}>{h}</span>
+              ))}
+              <span className="text-xs font-semibold text-slate-700">{t.games}</span>
+              <span className="text-xs font-semibold text-emerald-600">{t.wins}</span>
+              <span className="text-xs font-semibold text-amber-500">{t.draws}</span>
+              <span className="text-xs font-semibold text-red-400">{t.losses}</span>
+              <span className="text-xs font-semibold text-slate-600">{t.gf}</span>
+              <span className="text-xs font-semibold text-slate-600">{t.ga}</span>
+              <span className={cn('text-xs font-semibold', gd > 0 ? 'text-emerald-600' : gd < 0 ? 'text-red-400' : 'text-slate-500')}>
+                {gd > 0 ? '+' : ''}{gd}
+              </span>
+            </div>
+
+            {/* Per-game rates */}
+            {t.games > 0 && (
+              <div className="grid grid-cols-4 mt-2 pt-2 border-t border-slate-100/80">
+                {[
+                  { label: 'P/G',  value: (pts / t.games).toFixed(2), color: 'text-slate-600' },
+                  { label: 'GD/G', value: (gd >= 0 ? '+' : '') + (gd / t.games).toFixed(1), color: gd >= 0 ? 'text-emerald-600' : 'text-red-400' },
+                  { label: 'GF/G', value: (t.gf / t.games).toFixed(1), color: 'text-slate-600' },
+                  { label: 'GA/G', value: (t.ga / t.games).toFixed(1), color: 'text-slate-600' },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="text-center">
+                    <div className="text-[9px] text-slate-400 font-medium">{label}</div>
+                    <div className={cn('text-[11px] font-semibold', color)}>{value}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {/* Game list */}
+      {gameCount > 0 && (
+        <div className="px-4 py-3">
+          <p className="text-[10px] font-semibold text-slate-400 mb-2 tracking-wide">GAMES</p>
+          <div className="flex flex-col gap-1.5">
+            {session.games.map((g, gi) => {
               const t1won = g.score1 > g.score2
               const t2won = g.score2 > g.score1
               return (
-                <div key={g.id} className="border-b border-slate-50 last:border-0">
-                  {/* Score row — score absolutely centered */}
-                  <div className="relative flex items-center px-4 py-2.5">
-                    {/* Team 1 — right-aligned, leaves gap for score */}
-                    <div className="flex-1 flex items-center justify-end gap-1.5 pr-10">
-                      <span className={cn('text-sm font-semibold', teamText(g.team1), t1won ? 'text-slate-900' : '')}>
-                        {capitalize(g.team1)}
-                      </span>
-                      <div className={cn('h-2.5 w-2.5 rounded-full shrink-0', teamBg(g.team1))} />
-                    </div>
-                    {/* Score — pinned to exact center of the row */}
-                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 pointer-events-none">
-                      <span className={cn('text-base font-bold tabular-nums w-5 text-right', t1won ? 'text-slate-900' : 'text-slate-400')}>{g.score1}</span>
-                      <span className="text-slate-300 text-sm">–</span>
-                      <span className={cn('text-base font-bold tabular-nums w-5', t2won ? 'text-slate-900' : 'text-slate-400')}>{g.score2}</span>
-                    </div>
-                    {/* Team 2 — left-aligned */}
-                    <div className="flex-1 flex items-center gap-1.5 pl-10">
-                      <div className={cn('h-2.5 w-2.5 rounded-full shrink-0', teamBg(g.team2))} />
-                      <span className={cn('text-sm font-semibold', teamText(g.team2), t2won ? 'text-slate-900' : '')}>
-                        {capitalize(g.team2)}
-                      </span>
-                    </div>
-                    {/* Edit button — absolute right, never affects centering */}
-                    {loggedIn && (
-                      <button
-                        className="absolute right-3 p-1 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors"
-                        onClick={() => onEdit(g)}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </button>
-                    )}
+                <div key={g.id} className="relative flex items-center bg-slate-50 rounded-lg px-2 py-1.5">
+                  <span className="absolute left-2 text-[9px] font-semibold text-slate-300 w-4 text-center select-none">{gi + 1}</span>
+                  <div className="flex-1 flex items-center justify-end gap-1.5 pr-10">
+                    <span className={cn('text-xs font-semibold', teamText(g.team1), t1won && 'text-slate-900')}>{capitalize(g.team1)}</span>
+                    <div className={cn('h-2 w-2 rounded-full shrink-0', teamBg(g.team1))} />
                   </div>
-                  {/* Player names sub-row */}
-                  {(g.team1Players.length > 0 || g.team2Players.length > 0) && (
-                    <div className="flex px-4 pb-2 gap-2">
-                      <p className="text-[10px] text-slate-400 flex-1 truncate text-right leading-relaxed">
-                        {g.team1Players.map((n) => n.split(' ')[0]).join(', ')}
-                      </p>
-                      <div className="w-16 shrink-0" />
-                      <p className="text-[10px] text-slate-400 flex-1 truncate leading-relaxed">
-                        {g.team2Players.map((n) => n.split(' ')[0]).join(', ')}
-                      </p>
-                    </div>
+                  <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-0.5 pointer-events-none">
+                    <span className={cn('text-sm font-bold tabular-nums w-4 text-right', t1won ? 'text-slate-800' : 'text-slate-400')}>{g.score1}</span>
+                    <span className="text-slate-300 text-xs mx-0.5">–</span>
+                    <span className={cn('text-sm font-bold tabular-nums w-4', t2won ? 'text-slate-800' : 'text-slate-400')}>{g.score2}</span>
+                  </div>
+                  <div className="flex-1 flex items-center gap-1.5 pl-10">
+                    <div className={cn('h-2 w-2 rounded-full shrink-0', teamBg(g.team2))} />
+                    <span className={cn('text-xs font-semibold', teamText(g.team2), t2won && 'text-slate-900')}>{capitalize(g.team2)}</span>
+                  </div>
+                  {loggedIn && (
+                    <button
+                      className="absolute right-2 p-1 text-slate-300 hover:text-slate-500 transition-colors"
+                      onClick={() => onEdit(g, session.id)}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
                   )}
                 </div>
               )
             })}
           </div>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function SessionCarousel({
+  sessions,
+  loggedIn,
+  onEdit,
+}: {
+  sessions: SessionStat[]
+  loggedIn: boolean
+  onEdit: (g: SessionGameRow, sessionId: string) => void
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [current, setCurrent] = useState(0)
+
+  const handleScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    const cardWidth = el.scrollWidth / sessions.length
+    setCurrent(Math.round(el.scrollLeft / cardWidth))
+  }
+
+  if (sessions.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-2">
+        <Layers className="h-8 w-8 text-slate-300" />
+        <p className="text-sm text-slate-400">No sessions yet.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-1 -mx-4 px-4"
+        style={{ scrollbarWidth: 'none' }}
+      >
+        {sessions.map((s) => (
+          <div key={s.id} className="snap-center shrink-0 w-[min(calc(100vw-3rem),29rem)]">
+            <SessionCard session={s} loggedIn={loggedIn} onEdit={onEdit} />
+          </div>
         ))}
-      </Card>
+      </div>
+      {/* Dot indicators */}
+      {sessions.length > 1 && (
+        <div className="flex justify-center gap-1 pt-0.5">
+          {sessions.map((_, i) => (
+            <div
+              key={i}
+              className={cn(
+                'rounded-full transition-all',
+                i === current ? 'w-4 h-1.5 bg-emerald-500' : 'w-1.5 h-1.5 bg-slate-300'
+              )}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
+
+type LeaderboardView = 'overall' | 'sessions' | 'monthly'
 
 interface StatsTabProps {
   loggedIn?: boolean
 }
 
 export function StatsTab({ loggedIn = false }: StatsTabProps) {
+  const [view, setView] = useState<LeaderboardView>('overall')
   const [players, setPlayers] = useState<PlayerStat[]>([])
-  const [games, setGames] = useState<EnrichedGame[]>([])
   const [availableMonths, setAvailableMonths] = useState<string[]>([])
   const [monthIdx, setMonthIdx] = useState(-1)
+  const [sessions, setSessions] = useState<SessionStat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [editingGame, setEditingGame] = useState<EnrichedGame | null>(null)
+  const [showInfo, setShowInfo] = useState(false)
 
-  const loadMonth = async (month: string, months?: string[]) => {
+  const loadOverall = async () => {
+    setLoading(true)
+    try {
+      const data = await fetchStats()
+      setPlayers(data.players)
+      if (data.available_months.length > 0) setAvailableMonths(data.available_months)
+    } catch { setError(true) }
+    finally { setLoading(false) }
+  }
+
+  const loadMonth = async (month: string) => {
     setLoading(true)
     try {
       const data = await fetchStats(month)
       setPlayers(data.players)
-      setGames(data.recent_games)
-      if (months) setAvailableMonths(months)
-    } catch {
-      setError(true)
-    } finally {
-      setLoading(false)
-    }
+    } catch { setError(true) }
+    finally { setLoading(false) }
+  }
+
+  const loadSessions = async () => {
+    setLoading(true)
+    try {
+      const data = await fetchSessionStats()
+      setSessions(data.sessions)
+    } catch { setError(true) }
+    finally { setLoading(false) }
   }
 
   useEffect(() => {
     setLoading(true)
     fetchStats()
-      .then(async (data) => {
-        const months = data.available_months
-        setAvailableMonths(months)
-        if (months.length > 0) {
-          const lastIdx = months.length - 1
-          setMonthIdx(lastIdx)
-          const filtered = await fetchStats(months[lastIdx])
-          setPlayers(filtered.players)
-          setGames(filtered.recent_games)
-        } else {
-          setPlayers(data.players)
-          setGames(data.recent_games)
+      .then((data) => {
+        setPlayers(data.players)
+        if (data.available_months.length > 0) {
+          setAvailableMonths(data.available_months)
+          setMonthIdx(data.available_months.length - 1)
         }
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false))
   }, [])
+
+  const switchView = (next: LeaderboardView) => {
+    if (next === view) return
+    setView(next)
+    setShowInfo(false)
+    if (next === 'overall') loadOverall()
+    else if (next === 'sessions') loadSessions()
+    else {
+      const month = availableMonths[monthIdx]
+      if (month) loadMonth(month)
+    }
+  }
 
   const goMonth = (delta: number) => {
     const next = monthIdx + delta
@@ -323,18 +487,24 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
     loadMonth(availableMonths[next])
   }
 
+  const refresh = () => {
+    if (view === 'overall') loadOverall()
+    else if (view === 'sessions') loadSessions()
+    else loadMonth(availableMonths[monthIdx])
+  }
+
   const handleSave = async (id: string, s1: number, s2: number) => {
     await updateGame(id, s1, s2)
-    if (monthIdx >= 0 && availableMonths[monthIdx]) {
-      await loadMonth(availableMonths[monthIdx])
-    }
+    await refresh()
   }
 
   const handleDelete = async (id: string) => {
     await deleteGame(id)
-    if (monthIdx >= 0 && availableMonths[monthIdx]) {
-      await loadMonth(availableMonths[monthIdx])
-    }
+    await refresh()
+  }
+
+  const openEditForSessionGame = (g: SessionGameRow, sessionId: string) => {
+    setEditingGame({ ...g, session_id: sessionId, team1Players: [], team2Players: [] })
   }
 
   const currentMonth = monthIdx >= 0 ? availableMonths[monthIdx] : null
@@ -350,45 +520,119 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="overflow-hidden">
-        <div className="px-3 py-2.5 border-b border-slate-100 flex items-center gap-1">
-          <BarChart2 className="h-4 w-4 text-emerald-600 shrink-0" />
+      {/* View toggle */}
+      <div className="flex gap-1 bg-slate-200 rounded-xl p-1">
+        {(['overall', 'sessions', 'monthly'] as LeaderboardView[]).map((v) => (
           <button
-            className="p-0.5 rounded hover:bg-slate-100 disabled:opacity-30 transition-colors"
-            onClick={() => goMonth(-1)}
-            disabled={monthIdx <= 0 || loading}
+            key={v}
+            onClick={() => switchView(v)}
+            className={cn(
+              'flex-1 text-xs py-1.5 rounded-lg font-medium transition-colors',
+              view === v ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            )}
           >
-            <ChevronLeft className="h-4 w-4 text-slate-500" />
+            {v === 'overall' ? 'Overall' : v === 'sessions' ? 'Per Session' : 'Monthly'}
           </button>
-          <span className="text-sm font-semibold text-slate-700 flex-1 text-center">
-            {currentMonth ? formatMonth(currentMonth) : 'Leaderboard'}
-          </span>
-          <button
-            className="p-0.5 rounded hover:bg-slate-100 disabled:opacity-30 transition-colors"
-            onClick={() => goMonth(1)}
-            disabled={monthIdx >= availableMonths.length - 1 || loading}
-          >
-            <ChevronRight className="h-4 w-4 text-slate-500" />
-          </button>
-          <span className="text-xs text-slate-400 shrink-0 w-16 text-right">
-            {players.filter((p) => p.games_played >= MIN_GAMES).length} players
-          </span>
-        </div>
-        {loading ? (
+        ))}
+      </div>
+
+      {/* Per Session carousel */}
+      {view === 'sessions' && (
+        loading ? (
           <div className="flex justify-center py-10">
             <div className="h-8 w-8 rounded-full border-4 border-emerald-200 border-t-emerald-600 animate-spin" />
           </div>
         ) : (
-          <PlayerLeaderboard players={players} />
-        )}
-      </Card>
+          <SessionCarousel sessions={sessions} loggedIn={loggedIn} onEdit={openEditForSessionGame} />
+        )
+      )}
 
-      {!loading && (
-        <RecentGames
-          games={games}
-          loggedIn={loggedIn}
-          onEdit={setEditingGame}
-        />
+      {/* Overall / Monthly leaderboard */}
+      {view !== 'sessions' && (
+        <Card className="overflow-hidden">
+          <div className="px-3 py-2.5 border-b border-slate-100 flex items-center gap-1">
+            <BarChart2 className="h-4 w-4 text-emerald-600 shrink-0" />
+            {view === 'overall' ? (
+              <>
+                <span className="text-sm font-semibold text-slate-700 flex-1">Last 50 games</span>
+                <button
+                  onClick={() => setShowInfo((v) => !v)}
+                  className={cn(
+                    'h-5 w-5 rounded-full text-[11px] font-bold border transition-colors shrink-0',
+                    showInfo
+                      ? 'bg-emerald-600 border-emerald-600 text-white'
+                      : 'border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-600'
+                  )}
+                >
+                  ?
+                </button>
+                <span className="text-xs text-slate-400 ml-1">
+                  {players.filter((p) => (p.recent_count ?? 0) >= OVERALL_MIN).length} players
+                </span>
+              </>
+            ) : (
+              <>
+                <button
+                  className="p-0.5 rounded hover:bg-slate-100 disabled:opacity-30 transition-colors"
+                  onClick={() => goMonth(-1)}
+                  disabled={monthIdx <= 0 || loading}
+                >
+                  <ChevronLeft className="h-4 w-4 text-slate-500" />
+                </button>
+                <span className="text-sm font-semibold text-slate-700 flex-1 text-center">
+                  {currentMonth ? formatMonth(currentMonth) : '—'}
+                </span>
+                <button
+                  className="p-0.5 rounded hover:bg-slate-100 disabled:opacity-30 transition-colors"
+                  onClick={() => goMonth(1)}
+                  disabled={monthIdx >= availableMonths.length - 1 || loading}
+                >
+                  <ChevronRight className="h-4 w-4 text-slate-500" />
+                </button>
+                <button
+                  onClick={() => setShowInfo((v) => !v)}
+                  className={cn(
+                    'h-5 w-5 rounded-full text-[11px] font-bold border transition-colors shrink-0 ml-1',
+                    showInfo
+                      ? 'bg-emerald-600 border-emerald-600 text-white'
+                      : 'border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-600'
+                  )}
+                >
+                  ?
+                </button>
+                <span className="text-xs text-slate-400 w-10 text-right">
+                  {players.filter((p) => p.games_played >= MIN_GAMES).length} players
+                </span>
+              </>
+            )}
+          </div>
+          {showInfo && (
+            <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-100 flex flex-col gap-1.5 text-xs text-emerald-800">
+              {view === 'overall' ? (
+                <>
+                  <p className="font-semibold">How the Overall ranking works</p>
+                  <p>· Ranked by <strong>PPG</strong> (points per game): Win = 3 pts, Draw = 1 pt, Loss = 0 pts</p>
+                  <p>· Score calculated from your <strong>last 50 games</strong> only</p>
+                  <p>· You must have played <strong>50+ games in the last 5 months</strong> to appear — stop showing up and you drop off</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold">How the Monthly ranking works</p>
+                  <p>· Ranked by <strong>PPG</strong> (points per game): Win = 3 pts, Draw = 1 pt, Loss = 0 pts</p>
+                  <p>· Score based on all games played in the selected month</p>
+                  <p>· Must have played <strong>10+ games that month</strong> to appear</p>
+                </>
+              )}
+            </div>
+          )}
+          {loading ? (
+            <div className="flex justify-center py-10">
+              <div className="h-8 w-8 rounded-full border-4 border-emerald-200 border-t-emerald-600 animate-spin" />
+            </div>
+          ) : (
+            <PlayerLeaderboard players={players} view={view} />
+          )}
+        </Card>
       )}
 
       {editingGame && (
