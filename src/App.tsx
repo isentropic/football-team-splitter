@@ -1,21 +1,25 @@
 import { useState, useEffect } from 'react'
-import { Users, Trophy, Settings, LogOut } from 'lucide-react'
+import { Users, Trophy, Swords, Settings, LogOut } from 'lucide-react'
 import { SelectionTab } from '@/tabs/SelectionTab'
 import { SplitTab } from '@/tabs/SplitTab'
+import { GamesTab } from '@/tabs/GamesTab'
 import { ManageTab } from '@/tabs/ManageTab'
 import { LoginScreen } from '@/components/LoginScreen'
 import { cn } from '@/lib/utils'
 import { isLoggedIn, clearToken } from '@/lib/auth'
 import * as api from '@/lib/api'
-import type { Player, SplitVariant } from '@/lib/types'
+import type { Player, SplitVariant, Session, Game } from '@/lib/types'
 
-type Tab = 'select' | 'split' | 'manage'
+type Tab = 'select' | 'split' | 'games' | 'manage'
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: 'select', label: 'Select', icon: Users },
-  { id: 'split',  label: 'Teams',  icon: Trophy },
-  { id: 'manage', label: 'Players', icon: Settings },
+  { id: 'select', label: 'Select',  icon: Users     },
+  { id: 'split',  label: 'Teams',   icon: Trophy    },
+  { id: 'games',  label: 'Games',   icon: Swords    },
+  { id: 'manage', label: 'Players', icon: Settings  },
 ]
+
+const ACTIVE_SESSION_KEY = 'fts-active-session'
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(isLoggedIn)
@@ -25,6 +29,8 @@ export default function App() {
   const [variants, setVariants] = useState<SplitVariant[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [activeTab, setActiveTab] = useState<Tab>('select')
+  const [activeSession, setActiveSession] = useState<(Session & { games: Game[] }) | null>(null)
+  const [sessions, setSessions] = useState<Session[]>([])
 
   useEffect(() => {
     if (!loggedIn) return
@@ -32,6 +38,17 @@ export default function App() {
       .then(setPlayers)
       .catch(console.error)
       .finally(() => setPlayersLoading(false))
+
+    api.fetchSessions()
+      .then(setSessions)
+      .catch(console.error)
+
+    const savedId = localStorage.getItem(ACTIVE_SESSION_KEY)
+    if (savedId) {
+      api.fetchSession(savedId)
+        .then(setActiveSession)
+        .catch(() => localStorage.removeItem(ACTIVE_SESSION_KEY))
+    }
   }, [loggedIn])
 
   if (!loggedIn) {
@@ -76,6 +93,27 @@ export default function App() {
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  const handleLockTeams = async (variant: SplitVariant) => {
+    const teams = variant.teams.map((t) => ({
+      color: t.color,
+      playerIds: t.players.map((p) => p.id),
+    }))
+    const session = await api.createSession(teams)
+    const full = await api.fetchSession(session.id)
+    setActiveSession(full)
+    setSessions((prev) => [session, ...prev])
+    localStorage.setItem(ACTIVE_SESSION_KEY, session.id)
+    setActiveTab('games')
+  }
+
+  const handleRecordGame = async (
+    sessionId: string,
+    game: Pick<Game, 'team1' | 'score1' | 'team2' | 'score2'>
+  ) => {
+    const recorded = await api.recordGame(sessionId, game)
+    setActiveSession((prev) => prev ? { ...prev, games: [...prev.games, recorded] } : prev)
   }
 
   const handleLogout = () => {
@@ -126,6 +164,16 @@ export default function App() {
                 isLoading={isGenerating}
                 onRegenerate={handleGenerate}
                 hasSelection={selected.length === 15}
+                onLockTeams={handleLockTeams}
+              />
+            )}
+            {activeTab === 'games' && (
+              <GamesTab
+                activeSession={activeSession}
+                sessions={sessions}
+                players={players}
+                onRecordGame={handleRecordGame}
+                onNewSession={() => setActiveTab('select')}
               />
             )}
             {activeTab === 'manage' && (

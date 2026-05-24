@@ -1,4 +1,4 @@
-import type { Player } from './types'
+import type { Player, Session, Game } from './types'
 import { authHeaders } from './auth'
 
 async function handle<T>(res: Response): Promise<T> {
@@ -44,5 +44,39 @@ export async function importPlayers(players: Omit<Player, 'id'>[]): Promise<Play
     method: 'POST',
     headers: { ...JSON_HEADERS, ...authHeaders() },
     body: JSON.stringify(players),
+  }))
+}
+
+export async function fetchSessions(): Promise<Session[]> {
+  return handle<Session[]>(await fetch('/api/sessions'))
+}
+
+export async function fetchSession(id: string): Promise<Session & { games: Game[] }> {
+  return handle<Session & { games: Game[] }>(await fetch(`/api/sessions/${id}`))
+}
+
+export async function createSession(teams: Session['teams']): Promise<Session> {
+  return handle<Session>(await fetch('/api/sessions', {
+    method: 'POST',
+    headers: { ...JSON_HEADERS, ...authHeaders() },
+    body: JSON.stringify({ teams }),
+  }))
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  return handle<void>(await fetch(`/api/sessions/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  }))
+}
+
+export async function recordGame(
+  sessionId: string,
+  game: Pick<Game, 'team1' | 'score1' | 'team2' | 'score2'>
+): Promise<Game> {
+  return handle<Game>(await fetch(`/api/sessions/${sessionId}/games`, {
+    method: 'POST',
+    headers: { ...JSON_HEADERS, ...authHeaders() },
+    body: JSON.stringify(game),
   }))
 }

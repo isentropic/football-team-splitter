@@ -33,3 +33,19 @@ export interface SplitVariant {
 export interface SplitResponse {
   variants: SplitVariant[]
 }
+
+export interface Session {
+  id: string
+  teams: { color: string; playerIds: string[] }[]
+  played_at: number
+}
+
+export interface Game {
+  id: string
+  session_id: string
+  team1: string
+  team2: string
+  score1: number
+  score2: number
+  played_at: number
+}

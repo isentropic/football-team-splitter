@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Trophy, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { TeamAdjuster } from '@/components/TeamAdjuster'
 import { cn, initials, statBg } from '@/lib/utils'
 import type { SplitVariant, Team } from '@/lib/types'
 
@@ -10,13 +11,15 @@ interface Props {
   isLoading: boolean
   onRegenerate: () => void
   hasSelection: boolean
+  onLockTeams: (variant: SplitVariant) => void
 }
 
-const TEAM_COLORS = [
-  { bg: 'bg-emerald-500', light: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
-  { bg: 'bg-blue-500',    light: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200' },
-  { bg: 'bg-violet-500',  light: 'bg-violet-50',  text: 'text-violet-700',  border: 'border-violet-200' },
-]
+const TEAM_COLORS: Record<string, { bg: string; light: string; text: string; border: string }> = {
+  orange: { bg: 'bg-orange-500', light: 'bg-orange-50',  text: 'text-orange-700',  border: 'border-orange-200' },
+  blue:   { bg: 'bg-blue-500',   light: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200'   },
+  green:  { bg: 'bg-emerald-500',light: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200'},
+}
+const colorFor = (color: string) => TEAM_COLORS[color] ?? TEAM_COLORS['orange']
 
 const STATS: { key: keyof Team; label: string }[] = [
   { key: 'avgPace',      label: 'PAC' },
@@ -40,8 +43,20 @@ function StatBar({ label, value }: { label: string; value: number }) {
   )
 }
 
-function VariantCard({ variant, index, defaultOpen }: { variant: SplitVariant; index: number; defaultOpen: boolean }) {
+function VariantCard({ variant, index, defaultOpen, onUseTeams }: {
+  variant: SplitVariant
+  index: number
+  defaultOpen: boolean
+  onUseTeams: (v: SplitVariant) => void
+}) {
   const [expanded, setExpanded] = useState(defaultOpen)
+  const [adjusting, setAdjusting] = useState(false)
+
+  const handleUse = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setAdjusting(true)
+    if (!expanded) setExpanded(true)
+  }
 
   return (
     <Card className="overflow-hidden">
@@ -56,13 +71,23 @@ function VariantCard({ variant, index, defaultOpen }: { variant: SplitVariant; i
             Balance {(variant.balanceScore * 100).toFixed(0)}%
           </span>
         </div>
-        {expanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+        <div className="flex items-center gap-2">
+          {!adjusting && (
+            <span
+              className="text-xs text-emerald-600 font-medium px-2 py-0.5 rounded-full border border-emerald-200 hover:bg-emerald-50"
+              onClick={handleUse}
+            >
+              Use these teams
+            </span>
+          )}
+          {expanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+        </div>
       </button>
 
-      {expanded && (
+      {expanded && !adjusting && (
         <div className="px-4 pb-4 flex flex-col gap-3">
-          {variant.teams.map((team, ti) => {
-            const color = TEAM_COLORS[ti]
+          {variant.teams.map((team) => {
+            const color = colorFor(team.color)
             return (
               <div key={team.name} className={cn('rounded-xl border p-3', color.light, color.border)}>
                 <div className="flex items-center gap-2 mb-2">
@@ -88,13 +113,26 @@ function VariantCard({ variant, index, defaultOpen }: { variant: SplitVariant; i
               </div>
             )
           })}
+          <Button size="sm" className="w-full mt-1" onClick={handleUse}>
+            Use these teams
+          </Button>
+        </div>
+      )}
+
+      {expanded && adjusting && (
+        <div className="px-4 pb-4">
+          <TeamAdjuster
+            variant={variant}
+            onConfirm={(v) => { setAdjusting(false); onUseTeams(v) }}
+            onCancel={() => setAdjusting(false)}
+          />
         </div>
       )}
     </Card>
   )
 }
 
-export function SplitTab({ variants, isLoading, onRegenerate, hasSelection }: Props) {
+export function SplitTab({ variants, isLoading, onRegenerate, hasSelection, onLockTeams }: Props) {
   if (!hasSelection) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
@@ -133,7 +171,7 @@ export function SplitTab({ variants, isLoading, onRegenerate, hasSelection }: Pr
         </Button>
       </div>
       {variants.map((v, i) => (
-        <VariantCard key={v.id} variant={v} index={i} defaultOpen={i === 0} />
+        <VariantCard key={v.id} variant={v} index={i} defaultOpen={i === 0} onUseTeams={onLockTeams} />
       ))}
     </div>
   )
