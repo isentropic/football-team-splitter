@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Users, Trophy, Settings } from 'lucide-react'
+import { Users, Trophy, Settings, LogOut } from 'lucide-react'
 import { SelectionTab } from '@/tabs/SelectionTab'
 import { SplitTab } from '@/tabs/SplitTab'
 import { ManageTab } from '@/tabs/ManageTab'
+import { LoginScreen } from '@/components/LoginScreen'
 import { cn } from '@/lib/utils'
+import { isLoggedIn, clearToken } from '@/lib/auth'
 import * as api from '@/lib/api'
 import type { Player, SplitVariant } from '@/lib/types'
 
@@ -11,11 +13,12 @@ type Tab = 'select' | 'split' | 'manage'
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'select', label: 'Select', icon: Users },
-  { id: 'split', label: 'Teams', icon: Trophy },
+  { id: 'split',  label: 'Teams',  icon: Trophy },
   { id: 'manage', label: 'Players', icon: Settings },
 ]
 
 export default function App() {
+  const [loggedIn, setLoggedIn] = useState(isLoggedIn)
   const [players, setPlayers] = useState<Player[]>([])
   const [playersLoading, setPlayersLoading] = useState(true)
   const [selected, setSelected] = useState<string[]>([])
@@ -24,11 +27,16 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('select')
 
   useEffect(() => {
+    if (!loggedIn) return
     api.fetchPlayers()
       .then(setPlayers)
       .catch(console.error)
       .finally(() => setPlayersLoading(false))
-  }, [])
+  }, [loggedIn])
+
+  if (!loggedIn) {
+    return <LoginScreen onLogin={() => setLoggedIn(true)} />
+  }
 
   const handleAdd = async (data: Omit<Player, 'id'>) => {
     const player = await api.createPlayer(data)
@@ -65,10 +73,14 @@ export default function App() {
       setVariants(data.variants ?? [])
     } catch (err) {
       console.error(err)
-      setVariants([])
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  const handleLogout = () => {
+    clearToken()
+    setLoggedIn(false)
   }
 
   return (
@@ -76,12 +88,19 @@ export default function App() {
       <header className="bg-emerald-600 text-white px-4 pt-12 pb-4 shadow-md">
         <div className="flex items-center gap-2">
           <span className="text-2xl">⚽</span>
-          <div>
+          <div className="flex-1">
             <h1 className="text-lg font-bold leading-tight">Team Splitter</h1>
             <p className="text-emerald-200 text-xs">
               {playersLoading ? 'Loading…' : `${players.length} players in roster`}
             </p>
           </div>
+          <button
+            onClick={handleLogout}
+            className="p-2 rounded-xl hover:bg-emerald-700 transition-colors text-emerald-200 hover:text-white"
+            title="Sign out"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </header>
 
@@ -123,7 +142,7 @@ export default function App() {
       </main>
 
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white border-t border-slate-200 shadow-lg">
-        <div className="flex relative">
+        <div className="flex">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}

@@ -7,7 +7,8 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function overall(p: Player) {
-  return Math.round(((p.attack + p.defense + p.physical + p.morale) / 4) * 10) / 10
+  const sum = p.pace + p.shooting + p.passing + p.dribbling + p.defending + p.physique + p.morale
+  return Math.round((sum / 7) * 10) / 10
 }
 
 export function initials(name: string) {
@@ -21,13 +22,12 @@ export function initials(name: string) {
 
 export function statColor(value: number) {
   if (value >= 8) return 'text-emerald-600'
-  if (value >= 6) return 'text-amber-500'
+  if (value >= 7) return 'text-amber-500'
   return 'text-red-500'
 }
 
 export function statBg(value: number) {
   if (value >= 8) return 'bg-emerald-500'
-  if (value >= 6) return 'bg-amber-400'
+  if (value >= 7) return 'bg-amber-400'
   return 'bg-red-400'
 }
-

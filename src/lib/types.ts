@@ -1,9 +1,12 @@
 export interface Player {
   id: string
   name: string
-  attack: number
-  defense: number
-  physical: number
+  pace: number
+  shooting: number
+  passing: number
+  dribbling: number
+  defending: number
+  physique: number
   morale: number
 }
 
@@ -11,9 +14,12 @@ export interface Team {
   name: string
   color: string
   players: Player[]
-  avgAttack: number
-  avgDefense: number
-  avgPhysical: number
+  avgPace: number
+  avgShooting: number
+  avgPassing: number
+  avgDribbling: number
+  avgDefending: number
+  avgPhysique: number
   avgMorale: number
   avgOverall: number
 }
