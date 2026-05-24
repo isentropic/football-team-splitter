@@ -1,12 +1,12 @@
-import { getDb, ensureSchema, jsonError, type Env } from '../_lib/db'
+import { jsonError, type Env } from '../_lib/db'
 import type { Player } from '../../src/lib/types'
 
 export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   try {
-    const db = getDb(ctx.env)
-    await ensureSchema(db)
-    const rows = await db.sql`SELECT * FROM players ORDER BY name`
-    return Response.json(rows)
+    const { results } = await ctx.env.DB
+      .prepare('SELECT * FROM players ORDER BY name')
+      .all<Player>()
+    return Response.json(results)
   } catch (e) {
     return jsonError(String(e), 500)
   }
@@ -15,19 +15,15 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   try {
     const body = await ctx.request.json() as Omit<Player, 'id'> | Omit<Player, 'id'>[]
-    const db = getDb(ctx.env)
-    await ensureSchema(db)
+    const players = Array.isArray(body) ? body : [body]
 
-    // Supports single player or bulk import array
-    const players: Omit<Player, 'id'>[] = Array.isArray(body) ? body : [body]
     const created: Player[] = []
-
     for (const p of players) {
       const id = crypto.randomUUID()
-      await db.sql`
-        INSERT INTO players (id, name, attack, defense, physical, morale)
-        VALUES (${id}, ${p.name}, ${p.attack}, ${p.defense}, ${p.physical}, ${p.morale})
-      `
+      await ctx.env.DB
+        .prepare('INSERT INTO players (id, name, attack, defense, physical, morale) VALUES (?, ?, ?, ?, ?, ?)')
+        .bind(id, p.name, p.attack, p.defense, p.physical, p.morale)
+        .run()
       created.push({ id, ...p })
     }
 

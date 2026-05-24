@@ -1,3 +1,8 @@
 name = "football-team-splitter"
 compatibility_date = "2024-10-22"
 pages_build_output_dir = "./dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "football-team-splitter"
+database_id = "1d5434e9-0746-4f83-b195-e1bc87c6e7f8"
