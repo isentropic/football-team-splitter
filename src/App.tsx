@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Users, Trophy, Settings } from 'lucide-react'
 import { SelectionTab } from '@/tabs/SelectionTab'
 import { SplitTab } from '@/tabs/SplitTab'
 import { ManageTab } from '@/tabs/ManageTab'
-import { cn, loadPlayers, savePlayers } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+import * as api from '@/lib/api'
 import type { Player, SplitVariant } from '@/lib/types'
 
 type Tab = 'select' | 'split' | 'manage'
@@ -15,20 +16,44 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 ]
 
 export default function App() {
-  const [players, setPlayers] = useState<Player[]>(loadPlayers)
+  const [players, setPlayers] = useState<Player[]>([])
+  const [playersLoading, setPlayersLoading] = useState(true)
   const [selected, setSelected] = useState<string[]>([])
   const [variants, setVariants] = useState<SplitVariant[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
   const [activeTab, setActiveTab] = useState<Tab>('select')
 
-  const handlePlayersChange = (updated: Player[]) => {
-    setPlayers(updated)
-    savePlayers(updated)
+  useEffect(() => {
+    api.fetchPlayers()
+      .then(setPlayers)
+      .catch(console.error)
+      .finally(() => setPlayersLoading(false))
+  }, [])
+
+  const handleAdd = async (data: Omit<Player, 'id'>) => {
+    const player = await api.createPlayer(data)
+    setPlayers((prev) => [...prev, player].sort((a, b) => a.name.localeCompare(b.name)))
+  }
+
+  const handleUpdate = async (id: string, data: Omit<Player, 'id'>) => {
+    const updated = await api.updatePlayer(id, data)
+    setPlayers((prev) => prev.map((p) => (p.id === id ? updated : p)))
+  }
+
+  const handleDelete = async (id: string) => {
+    await api.deletePlayer(id)
+    setPlayers((prev) => prev.filter((p) => p.id !== id))
+    setSelected((prev) => prev.filter((s) => s !== id))
+  }
+
+  const handleImport = async (rows: Omit<Player, 'id'>[]) => {
+    const created = await api.importPlayers(rows)
+    setPlayers((prev) => [...prev, ...created].sort((a, b) => a.name.localeCompare(b.name)))
   }
 
   const handleGenerate = async () => {
     const selectedPlayers = players.filter((p) => selected.includes(p.id))
-    setIsLoading(true)
+    setIsGenerating(true)
     setActiveTab('split')
     try {
       const res = await fetch('/api/split', {
@@ -42,48 +67,61 @@ export default function App() {
       console.error(err)
       setVariants([])
     } finally {
-      setIsLoading(false)
+      setIsGenerating(false)
     }
   }
 
   return (
     <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-slate-100">
-      {/* Header */}
       <header className="bg-emerald-600 text-white px-4 pt-12 pb-4 shadow-md">
         <div className="flex items-center gap-2">
           <span className="text-2xl">⚽</span>
           <div>
             <h1 className="text-lg font-bold leading-tight">Team Splitter</h1>
-            <p className="text-emerald-200 text-xs">{players.length} players in roster</p>
+            <p className="text-emerald-200 text-xs">
+              {playersLoading ? 'Loading…' : `${players.length} players in roster`}
+            </p>
           </div>
         </div>
       </header>
 
-      {/* Content */}
       <main className="flex-1 px-4 py-4 pb-24 overflow-y-auto">
-        {activeTab === 'select' && (
-          <SelectionTab
-            players={players}
-            selected={selected}
-            onSelectionChange={setSelected}
-            onGenerate={handleGenerate}
-            isLoading={isLoading}
-          />
-        )}
-        {activeTab === 'split' && (
-          <SplitTab
-            variants={variants}
-            isLoading={isLoading}
-            onRegenerate={handleGenerate}
-            hasSelection={selected.length === 15}
-          />
-        )}
-        {activeTab === 'manage' && (
-          <ManageTab players={players} onChange={handlePlayersChange} />
+        {playersLoading ? (
+          <div className="flex justify-center py-20">
+            <div className="h-10 w-10 rounded-full border-4 border-emerald-200 border-t-emerald-600 animate-spin" />
+          </div>
+        ) : (
+          <>
+            {activeTab === 'select' && (
+              <SelectionTab
+                players={players}
+                selected={selected}
+                onSelectionChange={setSelected}
+                onGenerate={handleGenerate}
+                isLoading={isGenerating}
+              />
+            )}
+            {activeTab === 'split' && (
+              <SplitTab
+                variants={variants}
+                isLoading={isGenerating}
+                onRegenerate={handleGenerate}
+                hasSelection={selected.length === 15}
+              />
+            )}
+            {activeTab === 'manage' && (
+              <ManageTab
+                players={players}
+                onAdd={handleAdd}
+                onUpdate={handleUpdate}
+                onDelete={handleDelete}
+                onImport={handleImport}
+              />
+            )}
+          </>
         )}
       </main>
 
-      {/* Bottom nav */}
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white border-t border-slate-200 shadow-lg">
         <div className="flex relative">
           {TABS.map(({ id, label, icon: Icon }) => (

@@ -11,13 +11,13 @@ import {
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Trash2, Upload, ArrowUpDown, Search } from 'lucide-react'
+import { Plus, Trash2, Upload, ArrowUpDown, Search, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { cn, overall, statColor, generateId, initials } from '@/lib/utils'
+import { cn, overall, statColor, initials } from '@/lib/utils'
 import type { Player } from '@/lib/types'
 
 const schema = z.object({
@@ -44,18 +44,29 @@ const colorFor = (name: string) => avatarColors[name.charCodeAt(0) % avatarColor
 
 interface PlayerFormProps {
   defaultValues?: FormData
-  onSubmit: (data: FormData) => void
+  onSubmit: (data: FormData) => Promise<void>
   onClose: () => void
 }
 
 function PlayerForm({ defaultValues, onSubmit, onClose }: PlayerFormProps) {
+  const [submitting, setSubmitting] = useState(false)
   const { register, handleSubmit, control, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: defaultValues ?? { name: '', attack: 5, defense: 5, physical: 5, morale: 5 },
   })
 
+  const submit = async (data: FormData) => {
+    setSubmitting(true)
+    try {
+      await onSubmit(data)
+      onClose()
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
-    <form onSubmit={handleSubmit((d) => { onSubmit(d); onClose() })} className="flex flex-col gap-5">
+    <form onSubmit={handleSubmit(submit)} className="flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="name">Name</Label>
         <Input id="name" placeholder="Player name" {...register('name')} />
@@ -66,18 +77,14 @@ function PlayerForm({ defaultValues, onSubmit, onClose }: PlayerFormProps) {
         <div key={key} className="flex flex-col gap-2">
           <div className="flex justify-between">
             <Label>{label}</Label>
-            <span className={cn('text-sm font-bold', statColor(watch(key)))}>
-              {watch(key)}/10
-            </span>
+            <span className={cn('text-sm font-bold', statColor(watch(key)))}>{watch(key)}/10</span>
           </div>
           <Controller
             control={control}
             name={key}
             render={({ field }) => (
               <Slider
-                min={1}
-                max={10}
-                step={1}
+                min={1} max={10} step={1}
                 value={[field.value]}
                 onValueChange={([v]) => field.onChange(v)}
               />
@@ -87,8 +94,12 @@ function PlayerForm({ defaultValues, onSubmit, onClose }: PlayerFormProps) {
       ))}
 
       <div className="flex gap-2 pt-1">
-        <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-        <Button type="submit" className="flex-1">Save player</Button>
+        <Button type="button" variant="outline" className="flex-1" onClick={onClose} disabled={submitting}>
+          Cancel
+        </Button>
+        <Button type="submit" className="flex-1" disabled={submitting}>
+          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save player'}
+        </Button>
       </div>
     </form>
   )
@@ -96,15 +107,20 @@ function PlayerForm({ defaultValues, onSubmit, onClose }: PlayerFormProps) {
 
 interface Props {
   players: Player[]
-  onChange: (players: Player[]) => void
+  onAdd: (data: Omit<Player, 'id'>) => Promise<void>
+  onUpdate: (id: string, data: Omit<Player, 'id'>) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+  onImport: (players: Omit<Player, 'id'>[]) => Promise<void>
 }
 
-export function ManageTab({ players, onChange }: Props) {
+export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Props) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [importing, setImporting] = useState(false)
   const csvRef = useRef<HTMLInputElement>(null)
 
   const columns: ColumnDef<Player>[] = [
@@ -168,14 +184,12 @@ export function ManageTab({ players, onChange }: Props) {
       id: 'actions',
       header: '',
       cell: ({ row }) => (
-        <div className="flex gap-1 justify-end">
-          <button
-            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-            onClick={(e) => { e.stopPropagation(); setDeleteId(row.original.id) }}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <button
+          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+          onClick={(e) => { e.stopPropagation(); setDeleteId(row.original.id) }}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
       ),
     },
   ]
@@ -191,49 +205,46 @@ export function ManageTab({ players, onChange }: Props) {
     getFilteredRowModel: getFilteredRowModel(),
   })
 
-  const addPlayer = (data: FormData) => {
-    onChange([...players, { id: generateId(), ...data }])
-  }
-
-  const updatePlayer = (data: FormData) => {
-    if (!editingPlayer) return
-    onChange(players.map((p) => (p.id === editingPlayer.id ? { ...p, ...data } : p)))
-    setEditingPlayer(null)
-  }
-
-  const deletePlayer = (id: string) => {
-    onChange(players.filter((p) => p.id !== id))
-    setDeleteId(null)
+  const handleDelete = async () => {
+    if (!deleteId) return
+    setDeleting(true)
+    try {
+      await onDelete(deleteId)
+      setDeleteId(null)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const importCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const text = ev.target?.result as string
       const lines = text.trim().split('\n')
       const header = lines[0].split(',').map((h) => h.trim().toLowerCase())
-      const nameIdx = header.findIndex((h) => h === 'name')
-      const attackIdx = header.findIndex((h) => h === 'attack')
-      const defenseIdx = header.findIndex((h) => h === 'defense')
-      const physicalIdx = header.findIndex((h) => h === 'physical')
-      const moraleIdx = header.findIndex((h) => h === 'morale')
+      const idx = (name: string) => header.findIndex((h) => h === name)
 
-      const imported: Player[] = []
+      const rows: Omit<Player, 'id'>[] = []
       for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(',').map((c) => c.trim())
-        if (!cols[nameIdx]) continue
-        imported.push({
-          id: generateId(),
-          name: cols[nameIdx],
-          attack: Math.min(10, Math.max(1, Number(cols[attackIdx]) || 5)),
-          defense: Math.min(10, Math.max(1, Number(cols[defenseIdx]) || 5)),
-          physical: Math.min(10, Math.max(1, Number(cols[physicalIdx]) || 5)),
-          morale: Math.min(10, Math.max(1, Number(cols[moraleIdx]) || 5)),
+        if (!cols[idx('name')]) continue
+        rows.push({
+          name: cols[idx('name')],
+          attack: Math.min(10, Math.max(1, Number(cols[idx('attack')]) || 5)),
+          defense: Math.min(10, Math.max(1, Number(cols[idx('defense')]) || 5)),
+          physical: Math.min(10, Math.max(1, Number(cols[idx('physical')]) || 5)),
+          morale: Math.min(10, Math.max(1, Number(cols[idx('morale')]) || 5)),
         })
       }
-      onChange([...players, ...imported])
+
+      setImporting(true)
+      try {
+        await onImport(rows)
+      } finally {
+        setImporting(false)
+      }
     }
     reader.readAsText(file)
     e.target.value = ''
@@ -241,7 +252,6 @@ export function ManageTab({ players, onChange }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Actions bar */}
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -252,24 +262,25 @@ export function ManageTab({ players, onChange }: Props) {
             onChange={(e) => setGlobalFilter(e.target.value)}
           />
         </div>
-        <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" onClick={() => csvRef.current?.click()}>
-          <Upload className="h-4 w-4" />
+        <Button
+          variant="outline" size="icon" className="h-10 w-10 shrink-0"
+          onClick={() => csvRef.current?.click()}
+          disabled={importing}
+        >
+          {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
         </Button>
         <input ref={csvRef} type="file" accept=".csv" className="hidden" onChange={importCSV} />
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
-            <Button size="icon" className="h-10 w-10 shrink-0">
-              <Plus className="h-4 w-4" />
-            </Button>
+            <Button size="icon" className="h-10 w-10 shrink-0"><Plus className="h-4 w-4" /></Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add player</DialogTitle></DialogHeader>
-            <PlayerForm onSubmit={addPlayer} onClose={() => setAddOpen(false)} />
+            <PlayerForm onSubmit={onAdd} onClose={() => setAddOpen(false)} />
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Table */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -288,7 +299,7 @@ export function ManageTab({ players, onChange }: Props) {
               {table.getRowModel().rows.length === 0 && (
                 <tr>
                   <td colSpan={columns.length} className="text-center text-slate-400 py-10 text-sm">
-                    No players yet. Add one or import CSV.
+                    No players yet — add one or import a CSV.
                   </td>
                 </tr>
               )}
@@ -320,22 +331,22 @@ export function ManageTab({ players, onChange }: Props) {
           {editingPlayer && (
             <PlayerForm
               defaultValues={editingPlayer}
-              onSubmit={updatePlayer}
+              onSubmit={(data) => onUpdate(editingPlayer.id, data)}
               onClose={() => setEditingPlayer(null)}
             />
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirm dialog */}
+      {/* Delete confirm */}
       <Dialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Delete player?</DialogTitle></DialogHeader>
           <p className="text-sm text-slate-500 mb-5">This cannot be undone.</p>
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => setDeleteId(null)}>Cancel</Button>
-            <Button variant="destructive" className="flex-1" onClick={() => deleteId && deletePlayer(deleteId)}>
-              Delete
+            <Button variant="outline" className="flex-1" onClick={() => setDeleteId(null)} disabled={deleting}>Cancel</Button>
+            <Button variant="destructive" className="flex-1" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Delete'}
             </Button>
           </div>
         </DialogContent>

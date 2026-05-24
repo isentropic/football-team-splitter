@@ -1,0 +1,3 @@
+# Copy this file to .dev.vars and fill in your SQLiteCloud connection string
+# Get it from: https://sqlitecloud.io → your project → Connection strings
+SQLITECLOUD_URL=sqlitecloud://apikey@yourhost.sqlite.cloud:8860/football
