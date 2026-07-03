@@ -61,45 +61,6 @@ function MedalIcon({ rank }: { rank: number }) {
 }
 
 const MIN_GAMES = 10
-const ppgFor = (p: PlayerStat) => p.games_played > 0 ? p.pts / p.games_played : 0
-
-function StatsOverview({ players, loading }: { players: PlayerStat[]; loading: boolean }) {
-  const leader = players[0]
-  const averagePpg = players.length > 0
-    ? players.reduce((sum, player) => sum + ppgFor(player), 0) / players.length
-    : 0
-
-  return (
-    <div className="overflow-hidden rounded-[1.25rem] border border-white/80 bg-white/70 shadow-[0_20px_60px_rgba(31,24,16,0.08)] backdrop-blur-xl">
-      <div className="relative px-4 py-4">
-        <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#ff6b53,#2563eb,#11a36a,#ffc43d)]" />
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9b8f84]">Overall</p>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[#201a16]">Last 50 games</h2>
-          </div>
-          <div className="rounded-full border border-white/80 bg-[#f8f3ea]/80 px-3 py-1 text-xs font-medium text-[#6d6258] shadow-sm">
-            {loading ? 'Loading' : `${players.length} players`}
-          </div>
-        </div>
-        <div className="mt-5 grid grid-cols-3 gap-2">
-          <div className="rounded-2xl border border-[#efe7dc] bg-[#fffaf4]/80 px-3 py-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#a1968c]">Leader</p>
-            <p className="mt-1 truncate text-sm font-semibold text-slate-900">{leader?.name ?? '—'}</p>
-          </div>
-          <div className="rounded-2xl border border-[#efe7dc] bg-[#fffaf4]/80 px-3 py-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#a1968c]">Top PPG</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">{leader ? ppgFor(leader).toFixed(2) : '—'}</p>
-          </div>
-          <div className="rounded-2xl border border-[#efe7dc] bg-[#fffaf4]/80 px-3 py-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#a1968c]">Avg PPG</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">{players.length > 0 ? averagePpg.toFixed(2) : '—'}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function PlayerLeaderboard({ players, view }: { players: PlayerStat[]; view: 'overall' | 'monthly' }) {
   const isOverall = view === 'overall'
@@ -117,13 +78,13 @@ function PlayerLeaderboard({ players, view }: { players: PlayerStat[]; view: 'ov
   }
 
   return (
-    <div className="flex flex-col gap-2 p-2">
-      <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-x-2 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#a1968c]">
+    <div className="flex flex-col">
+      <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-x-2 px-3 py-1.5 text-xs font-semibold text-slate-400 border-b border-slate-100">
         <span>Player</span>
         <span className="w-7 text-center">GP</span>
-        <span className="w-5 text-center text-[#0f9b70]">W</span>
-        <span className="w-5 text-center text-[#f59e0b]">D</span>
-        <span className="w-5 text-center text-[#ef4444]">L</span>
+        <span className="w-5 text-center text-emerald-600">W</span>
+        <span className="w-5 text-center text-amber-500">D</span>
+        <span className="w-5 text-center text-red-400">L</span>
         <span className="w-10 text-center text-slate-600">PPG</span>
       </div>
       {ranked.map((p, i) => {
@@ -132,16 +93,14 @@ function PlayerLeaderboard({ players, view }: { players: PlayerStat[]; view: 'ov
           <div
             key={p.id}
             className={cn(
-              'grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-x-2 items-center rounded-2xl border px-2.5 py-2.5 shadow-sm transition-colors',
-              i < 3
-                ? 'border-[#f3dfc4] bg-[#fff9ef]'
-                : 'border-white/80 bg-white/72 hover:bg-white'
+              'grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-x-2 items-center px-3 py-2.5 border-b border-slate-50 last:border-0',
+              i < 3 && 'bg-gradient-to-r from-slate-50/80 to-transparent'
             )}
           >
             <div className="flex items-center gap-2 min-w-0">
               <MedalIcon rank={i + 1} />
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-900 truncate">{p.name}</p>
+                <p className="text-sm font-medium text-slate-800 truncate">{p.name}</p>
                 <WinBar wins={p.wins} draws={p.draws} losses={p.losses} />
               </div>
             </div>
@@ -149,7 +108,7 @@ function PlayerLeaderboard({ players, view }: { players: PlayerStat[]; view: 'ov
             <span className="w-5 text-center text-xs font-semibold text-emerald-600">{p.wins}</span>
             <span className="w-5 text-center text-xs font-semibold text-amber-500">{p.draws}</span>
             <span className="w-5 text-center text-xs font-semibold text-red-400">{p.losses}</span>
-            <span className="w-10 rounded-full bg-[#f3eee7] py-1 text-center text-xs font-bold text-slate-800">{ppg}</span>
+            <span className="w-10 text-center text-xs font-bold text-slate-700">{ppg}</span>
           </div>
         )
       })}
@@ -524,21 +483,16 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
   }
 
   return (
-    <div className="stats-page -mx-4 -my-4 min-h-[calc(100vh-5rem)] px-4 py-5">
-      <div className="relative z-10 flex flex-col gap-4">
-      {view === 'overall' && (
-        <StatsOverview players={players} loading={loading} />
-      )}
-
+    <div className="flex flex-col gap-4">
       {/* View toggle */}
-      <div className="flex gap-1 rounded-2xl border border-white/70 bg-white/55 p-1 shadow-sm backdrop-blur-xl">
+      <div className="flex gap-1 bg-slate-200 rounded-xl p-1">
         {(['overall', 'sessions', 'monthly'] as LeaderboardView[]).map((v) => (
           <button
             key={v}
             onClick={() => switchView(v)}
             className={cn(
-              'flex-1 rounded-xl py-2 text-xs font-semibold transition-colors',
-              view === v ? 'bg-[#201a16] text-white shadow-sm' : 'text-[#83786f] hover:text-slate-900'
+              'flex-1 text-xs py-1.5 rounded-lg font-medium transition-colors',
+              view === v ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             )}
           >
             {v === 'overall' ? 'Overall' : v === 'sessions' ? 'Per Session' : 'Monthly'}
@@ -559,19 +513,19 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
 
       {/* Overall / Monthly leaderboard */}
       {view !== 'sessions' && (
-        <Card className="overflow-hidden rounded-[1.25rem] border-white/80 bg-white/70 shadow-[0_20px_60px_rgba(31,24,16,0.08)] backdrop-blur-xl">
-          <div className="flex items-center gap-2 border-b border-[#eee7de] px-3 py-3">
-            <BarChart2 className="h-4 w-4 text-[#0f9b70] shrink-0" />
+        <Card className="overflow-hidden">
+          <div className="px-3 py-2.5 border-b border-slate-100 flex items-center gap-1">
+            <BarChart2 className="h-4 w-4 text-emerald-600 shrink-0" />
             {view === 'overall' ? (
               <>
-                <span className="text-sm font-semibold text-[#201a16] flex-1">Leaderboard</span>
+                <span className="text-sm font-semibold text-slate-700 flex-1">Last 50 games</span>
                 <button
                   onClick={() => setShowInfo((v) => !v)}
                   className={cn(
                     'h-5 w-5 rounded-full text-[11px] font-bold border transition-colors shrink-0',
                     showInfo
-                      ? 'bg-[#201a16] border-[#201a16] text-white'
-                      : 'border-[#ddd2c5] text-[#9b8f84] hover:border-[#bfb3a6] hover:text-slate-700'
+                      ? 'bg-emerald-600 border-emerald-600 text-white'
+                      : 'border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-600'
                   )}
                 >
                   ?
@@ -604,8 +558,8 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
                   className={cn(
                     'h-5 w-5 rounded-full text-[11px] font-bold border transition-colors shrink-0 ml-1',
                     showInfo
-                      ? 'bg-[#201a16] border-[#201a16] text-white'
-                      : 'border-[#ddd2c5] text-[#9b8f84] hover:border-[#bfb3a6] hover:text-slate-700'
+                      ? 'bg-emerald-600 border-emerald-600 text-white'
+                      : 'border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-600'
                   )}
                 >
                   ?
@@ -617,7 +571,7 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
             )}
           </div>
           {showInfo && (
-            <div className="flex flex-col gap-1.5 border-b border-[#e9dfd1] bg-[#fff8eb]/85 px-4 py-3 text-xs text-[#6d6258]">
+            <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-100 flex flex-col gap-1.5 text-xs text-emerald-800">
               {view === 'overall' ? (
                 <>
                   <p className="font-semibold">How the Overall ranking works</p>
@@ -653,7 +607,6 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
           onClose={() => setEditingGame(null)}
         />
       )}
-      </div>
     </div>
   )
 }

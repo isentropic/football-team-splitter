@@ -180,13 +180,16 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-[#f7f4ee] text-slate-950">
-      <header className="relative z-10 border-b border-white/70 bg-[#fbf7f0]/85 px-4 pt-10 pb-3 shadow-[0_10px_30px_rgba(31,24,16,0.06)] backdrop-blur-xl">
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/80 bg-white/80 text-xl shadow-sm">⚽</span>
+    <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-[#fafafa]">
+      <header className="relative overflow-hidden bg-[linear-gradient(135deg,#fffdf7_0%,#fff1e7_20%,#ff7a59_46%,#245cff_72%,#08a05f_100%)] text-slate-950 px-4 pt-12 pb-4 shadow-[0_10px_30px_rgba(15,23,42,0.10)]">
+        <div className="absolute inset-0 bg-white/18" />
+        <div className="absolute -bottom-20 -left-12 h-40 w-64 rotate-[-12deg] rounded-[50%] bg-[linear-gradient(90deg,#1228ff,#8fe9ff,#ffe04b)] opacity-55 blur-2xl" />
+        <div className="absolute -right-16 -top-20 h-44 w-72 rounded-[50%] bg-[linear-gradient(90deg,#ff4d8d,#ff8f5a,#f7ffd0)] opacity-65 blur-2xl" />
+        <div className="relative flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/70 text-2xl shadow-sm backdrop-blur">⚽</span>
           <div className="flex-1">
-            <h1 className="text-lg font-semibold leading-tight tracking-tight text-[#201a16]">Team Splitter</h1>
-            <p className="text-xs text-[#8a8177]">
+            <h1 className="text-lg font-bold leading-tight text-slate-950 drop-shadow-[0_1px_0_rgba(255,255,255,0.35)]">Team Splitter</h1>
+            <p className="text-slate-700 text-xs">
               {loggedIn
                 ? (playersLoading ? 'Loading…' : `${activePlayers.length} active players`)
                 : 'Viewing stats'}
@@ -195,7 +198,7 @@ export default function App() {
           {loggedIn ? (
             <button
               onClick={handleLogout}
-              className="rounded-xl border border-white/70 bg-white/60 p-2 text-[#8a8177] shadow-sm transition-colors hover:bg-white hover:text-slate-900"
+              className="p-2 rounded-xl bg-white/45 hover:bg-white/70 transition-colors text-slate-700 hover:text-slate-950 backdrop-blur"
               title="Sign out"
             >
               <LogOut className="h-4 w-4" />
@@ -203,7 +206,7 @@ export default function App() {
           ) : (
             <button
               onClick={() => setActiveTab('teams')}
-              className="rounded-full border border-white/70 bg-white/60 px-3 py-1.5 text-xs font-medium text-[#6d6258] shadow-sm transition-colors hover:bg-white hover:text-slate-900"
+              className="text-xs text-slate-700 hover:text-slate-950 px-2 py-1 rounded-lg bg-white/35 hover:bg-white/65 transition-colors backdrop-blur"
             >
               Admin login
             </button>
@@ -262,7 +265,7 @@ export default function App() {
         ))}
       </main>
 
-      {loggedIn && <nav className="fixed bottom-0 left-1/2 z-20 w-full max-w-lg -translate-x-1/2 border-t border-white/70 bg-[#fffaf4]/90 shadow-[0_-16px_35px_rgba(31,24,16,0.08)] backdrop-blur-xl">
+      {loggedIn && <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white border-t border-slate-200 shadow-lg">
         <div className="flex">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
@@ -270,7 +273,7 @@ export default function App() {
               onClick={() => setActiveTab(id)}
               className={cn(
                 'flex-1 flex flex-col items-center justify-center gap-1 py-3 text-xs font-medium transition-colors',
-                activeTab === id ? 'text-[#0f9b70]' : 'text-[#9c9288] hover:text-slate-700'
+                activeTab === id ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'
               )}
             >
               <Icon className={cn('h-5 w-5', activeTab === id && 'stroke-[2.5px]')} />
