@@ -42,7 +42,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   const [{ results: sessions }, { results: allGames }, { results: players }] = await Promise.all([
     ctx.env.DB.prepare('SELECT id, teams FROM sessions').all(),
     ctx.env.DB.prepare('SELECT * FROM games ORDER BY played_at DESC, rowid DESC').all(),
-    ctx.env.DB.prepare('SELECT id, name, retired FROM players ORDER BY name ASC').all(),
+    ctx.env.DB.prepare('SELECT id, name FROM players ORDER BY name ASC').all(),
   ])
 
   // Build color→playerIds map per session
@@ -67,7 +67,6 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   const baseMap = (): Record<string, StatRow> => {
     const m: Record<string, StatRow> = {}
     for (const p of players) {
-      if (p.retired) continue
       m[p.id as string] = makeStatRow(p.id as string, p.name as string)
     }
     return m

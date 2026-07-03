@@ -12,7 +12,6 @@ function normalizePlayer(row: Record<string, unknown>): Player {
     defending: row.defending as number,
     physique: row.physique as number,
     morale: row.morale as number,
-    retired: Boolean(row.retired),
   }
 }
 
@@ -38,10 +37,10 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     for (const p of players) {
       const id = crypto.randomUUID()
       await ctx.env.DB
-        .prepare('INSERT INTO players (id,name,pace,shooting,passing,dribbling,defending,physique,morale,retired) VALUES (?,?,?,?,?,?,?,?,?,?)')
-        .bind(id, p.name, p.pace, p.shooting, p.passing, p.dribbling, p.defending, p.physique, p.morale, p.retired ? 1 : 0)
+        .prepare('INSERT INTO players (id,name,pace,shooting,passing,dribbling,defending,physique,morale) VALUES (?,?,?,?,?,?,?,?,?)')
+        .bind(id, p.name, p.pace, p.shooting, p.passing, p.dribbling, p.defending, p.physique, p.morale)
         .run()
-      created.push({ id, ...p, retired: Boolean(p.retired) })
+      created.push({ id, ...p })
     }
 
     return Response.json(Array.isArray(body) ? created : created[0], { status: 201 })
