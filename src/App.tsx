@@ -181,16 +181,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-[#fafafa]">
-      <header className="relative overflow-hidden bg-[linear-gradient(135deg,#f8fff2_0%,#d9f7dc_28%,#8edee8_58%,#1f65d8_100%)] text-slate-950 px-4 pt-12 pb-4 shadow-[0_10px_30px_rgba(15,23,42,0.10)]">
-        <div className="absolute inset-0 bg-white/16" />
-        <div className="absolute inset-0 opacity-[0.16] [background-image:radial-gradient(rgba(15,23,42,0.45)_0.7px,transparent_0.7px)] [background-size:6px_6px]" />
-        <div className="absolute -bottom-20 -left-12 h-40 w-64 rotate-[-12deg] rounded-[50%] bg-[linear-gradient(90deg,#0b4fd8,#8fe9ff,#edffd0)] opacity-50 blur-2xl" />
-        <div className="absolute -right-20 -top-24 h-44 w-72 rounded-[50%] bg-[linear-gradient(90deg,#f8fff2,#b5f4ce,#5ab8ef)] opacity-60 blur-2xl" />
+      <header className="app-header-premium-pitch relative overflow-hidden px-4 pt-12 pb-4 text-white shadow-[0_14px_35px_rgba(5,46,22,0.18)]">
         <div className="relative flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/70 text-2xl shadow-sm backdrop-blur">⚽</span>
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/18 text-2xl shadow-sm backdrop-blur-md">⚽</span>
           <div className="flex-1">
-            <h1 className="text-lg font-bold leading-tight text-slate-950 drop-shadow-[0_1px_0_rgba(255,255,255,0.35)]">Team Splitter</h1>
-            <p className="text-slate-700 text-xs">
+            <h1 className="text-lg font-bold leading-tight text-white drop-shadow-[0_1px_1px_rgba(5,46,22,0.35)]">Team Splitter</h1>
+            <p className="text-lime-50/80 text-xs">
               {loggedIn
                 ? (playersLoading ? 'Loading…' : `${activePlayers.length} active players`)
                 : 'Viewing stats'}
@@ -199,7 +195,7 @@ export default function App() {
           {loggedIn ? (
             <button
               onClick={handleLogout}
-              className="p-2 rounded-xl bg-white/45 hover:bg-white/70 transition-colors text-slate-700 hover:text-slate-950 backdrop-blur"
+              className="p-2 rounded-xl border border-white/15 bg-white/12 text-white/80 backdrop-blur-md transition-colors hover:bg-white/22 hover:text-white"
               title="Sign out"
             >
               <LogOut className="h-4 w-4" />
@@ -207,7 +203,7 @@ export default function App() {
           ) : (
             <button
               onClick={() => setActiveTab('teams')}
-              className="text-xs text-slate-700 hover:text-slate-950 px-2 py-1 rounded-lg bg-white/35 hover:bg-white/65 transition-colors backdrop-blur"
+              className="rounded-lg border border-white/15 bg-white/12 px-2 py-1 text-xs text-white/80 backdrop-blur-md transition-colors hover:bg-white/22 hover:text-white"
             >
               Admin login
             </button>
