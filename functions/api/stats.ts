@@ -37,7 +37,9 @@ function sortByPPG(rows: StatRow[]): StatRow[] {
 }
 
 export const onRequestGet: PagesFunction<Env> = async (ctx) => {
-  const month = new URL(ctx.request.url).searchParams.get('month')
+  const params = new URL(ctx.request.url).searchParams
+  const month = params.get('month')
+  const scope = params.get('scope')
 
   const [{ results: sessions }, { results: allGames }, { results: players }] = await Promise.all([
     ctx.env.DB.prepare('SELECT id, teams FROM sessions').all(),
@@ -76,7 +78,21 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   let statsMap: Record<string, StatRow>
   let games: typeof allGames
 
-  if (month) {
+  if (scope === 'all') {
+    // ── All-time mode ───────────────────────────────────────────────────────
+    games = allGames
+    statsMap = baseMap()
+
+    for (const g of games) {
+      const colorMap = sessionTeamMap[g.session_id as string]
+      if (!colorMap) continue
+      const t1 = colorMap[g.team1 as string] ?? []
+      const t2 = colorMap[g.team2 as string] ?? []
+      const s1 = g.score1 as number, s2 = g.score2 as number
+      accumulateGame(statsMap, t1, s1 > s2, s1 === s2)
+      accumulateGame(statsMap, t2, s2 > s1, s1 === s2)
+    }
+  } else if (month) {
     // ── Monthly mode ────────────────────────────────────────────────────────
     games = allGames.filter((g) => monthKey(g.played_at as number) === month)
     statsMap = baseMap()

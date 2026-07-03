@@ -63,7 +63,7 @@ export interface PlayerStat {
   draws: number
   losses: number
   pts: number
-  recent_count?: number  // games in the recency window; only present in overall mode
+  recent_count?: number  // games in the recency window; only present in Last 50 mode
 }
 
 export interface EnrichedGame extends Game {

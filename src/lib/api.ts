@@ -82,8 +82,8 @@ export async function fetchSessionStats(): Promise<SessionStatsResponse> {
   return handle<SessionStatsResponse>(await fetch('/api/session-stats'))
 }
 
-export async function fetchStats(month?: string): Promise<StatsResponse> {
-  const url = month ? `/api/stats?month=${month}` : '/api/stats'
+export async function fetchStats(scope: 'all' | 'recent' = 'recent'): Promise<StatsResponse> {
+  const url = scope === 'all' ? '/api/stats?scope=all' : '/api/stats'
   return handle<StatsResponse>(await fetch(url))
 }
 
