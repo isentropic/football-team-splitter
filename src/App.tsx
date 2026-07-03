@@ -181,10 +181,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-[#fafafa]">
-      <header className="relative overflow-hidden bg-[linear-gradient(135deg,#fffdf7_0%,#fff1e7_20%,#ff7a59_46%,#245cff_72%,#08a05f_100%)] text-slate-950 px-4 pt-12 pb-4 shadow-[0_10px_30px_rgba(15,23,42,0.10)]">
-        <div className="absolute inset-0 bg-white/18" />
-        <div className="absolute -bottom-20 -left-12 h-40 w-64 rotate-[-12deg] rounded-[50%] bg-[linear-gradient(90deg,#1228ff,#8fe9ff,#ffe04b)] opacity-55 blur-2xl" />
-        <div className="absolute -right-16 -top-20 h-44 w-72 rounded-[50%] bg-[linear-gradient(90deg,#ff4d8d,#ff8f5a,#f7ffd0)] opacity-65 blur-2xl" />
+      <header className="relative overflow-hidden bg-[linear-gradient(135deg,#f8fff2_0%,#d9f7dc_28%,#8edee8_58%,#1f65d8_100%)] text-slate-950 px-4 pt-12 pb-4 shadow-[0_10px_30px_rgba(15,23,42,0.10)]">
+        <div className="absolute inset-0 bg-white/16" />
+        <div className="absolute inset-0 opacity-[0.16] [background-image:radial-gradient(rgba(15,23,42,0.45)_0.7px,transparent_0.7px)] [background-size:6px_6px]" />
+        <div className="absolute -bottom-20 -left-12 h-40 w-64 rotate-[-12deg] rounded-[50%] bg-[linear-gradient(90deg,#0b4fd8,#8fe9ff,#edffd0)] opacity-50 blur-2xl" />
+        <div className="absolute -right-20 -top-24 h-44 w-72 rounded-[50%] bg-[linear-gradient(90deg,#f8fff2,#b5f4ce,#5ab8ef)] opacity-60 blur-2xl" />
         <div className="relative flex items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/70 text-2xl shadow-sm backdrop-blur">⚽</span>
           <div className="flex-1">
