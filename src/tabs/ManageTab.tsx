@@ -47,6 +47,30 @@ const colorFor = (name: string) => avatarColors[name.charCodeAt(0) % avatarColor
 
 const DEFAULT_STATS: Omit<FormData, 'name'> = { pace:7, shooting:7, passing:7, dribbling:7, defending:7, physique:7, morale:7, retired: false }
 
+const normalizeRating = (value: unknown) => {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return 7
+  return Math.min(10, Math.max(1, Math.round(numeric * 2) / 2))
+}
+
+const playerToFormData = (player: Player): FormData => ({
+  name: player.name,
+  pace: normalizeRating(player.pace),
+  shooting: normalizeRating(player.shooting),
+  passing: normalizeRating(player.passing),
+  dribbling: normalizeRating(player.dribbling),
+  defending: normalizeRating(player.defending),
+  physique: normalizeRating(player.physique),
+  morale: normalizeRating(player.morale),
+  retired: Boolean(player.retired),
+})
+
+const formatRating = (value: unknown) => {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return '-'
+  return numeric.toFixed(1).replace(/\.0$/, '')
+}
+
 function PlayerForm({ defaultValues, onSubmit, onClose }: {
   defaultValues?: FormData
   onSubmit: (data: FormData) => Promise<void>
@@ -138,7 +162,10 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
         {label} <ArrowUpDown className="h-3 w-3" />
       </button>
     ),
-    cell: ({ getValue }) => <span className={cn('text-xs font-semibold', statColor(getValue() as number))}>{getValue() as number}</span>,
+    cell: ({ getValue }) => {
+      const value = Number(getValue())
+      return <span className={cn('text-xs font-semibold', statColor(value))}>{formatRating(value)}</span>
+    },
   })
 
   const columns: ColumnDef<Player>[] = [
@@ -325,18 +352,19 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
         </div>
       </div>
 
-      <Dialog open={!!editingPlayer} onOpenChange={(o) => !o && setEditingPlayer(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Edit player</DialogTitle></DialogHeader>
-          {editingPlayer && (
+      {editingPlayer && (
+        <Dialog open onOpenChange={(o) => !o && setEditingPlayer(null)}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Edit player</DialogTitle></DialogHeader>
             <PlayerForm
-              defaultValues={editingPlayer}
+              key={editingPlayer.id}
+              defaultValues={playerToFormData(editingPlayer)}
               onSubmit={(data) => onUpdate(editingPlayer.id, data)}
               onClose={() => setEditingPlayer(null)}
             />
-          )}
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Dialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <DialogContent>
