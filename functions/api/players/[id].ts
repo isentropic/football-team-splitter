@@ -8,11 +8,11 @@ export const onRequestPut: PagesFunction<Env> = async (ctx) => {
     const id = ctx.params.id as string
     const p = await ctx.request.json() as Omit<Player, 'id'>
     const { meta } = await ctx.env.DB
-      .prepare('UPDATE players SET name=?,pace=?,shooting=?,passing=?,dribbling=?,defending=?,physique=?,morale=? WHERE id=?')
-      .bind(p.name, p.pace, p.shooting, p.passing, p.dribbling, p.defending, p.physique, p.morale, id)
+      .prepare('UPDATE players SET name=?,pace=?,shooting=?,passing=?,dribbling=?,defending=?,physique=?,morale=?,retired=? WHERE id=?')
+      .bind(p.name, p.pace, p.shooting, p.passing, p.dribbling, p.defending, p.physique, p.morale, p.retired ? 1 : 0, id)
       .run()
     if (meta.changes === 0) return jsonError('Player not found', 404)
-    return Response.json({ id, ...p })
+    return Response.json({ id, ...p, retired: Boolean(p.retired) })
   } catch (e) {
     return jsonError(String(e), 500)
   }

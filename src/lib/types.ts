@@ -8,6 +8,7 @@ export interface Player {
   defending: number
   physique: number
   morale: number
+  retired: boolean
 }
 
 export interface Team {

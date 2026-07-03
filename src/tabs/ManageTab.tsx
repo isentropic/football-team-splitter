@@ -27,6 +27,7 @@ const schema = z.object({
   morale:     stat,
 })
 type FormData = z.infer<typeof schema>
+type PlayerPayload = Omit<Player, 'id'>
 
 const STATS: { key: keyof Omit<FormData, 'name'>; label: string }[] = [
   { key: 'pace',      label: 'Pace' },
@@ -124,10 +125,10 @@ function PlayerForm({ defaultValues, onSubmit, onClose }: {
 
 interface Props {
   players: Player[]
-  onAdd: (data: Omit<Player, 'id'>) => Promise<void>
-  onUpdate: (id: string, data: Omit<Player, 'id'>) => Promise<void>
+  onAdd: (data: PlayerPayload) => Promise<void>
+  onUpdate: (id: string, data: PlayerPayload) => Promise<void>
   onDelete: (id: string) => Promise<void>
-  onImport: (players: Omit<Player, 'id'>[]) => Promise<void>
+  onImport: (players: PlayerPayload[]) => Promise<void>
 }
 
 export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Props) {
@@ -139,6 +140,7 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
   const [deleting, setDeleting] = useState(false)
   const [importing, setImporting] = useState(false)
   const csvRef = useRef<HTMLInputElement>(null)
+  const visiblePlayers = players.filter((player) => !player.retired)
 
   const colDef = (key: keyof Player, label: string): ColumnDef<Player> => ({
     accessorKey: key,
@@ -194,7 +196,7 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
   ]
 
   const table = useReactTable({
-    data: players, columns,
+    data: visiblePlayers, columns,
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
@@ -220,12 +222,12 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
       const idx = (n: string) => header.findIndex((h) => h === n)
       const clamp = (v: number) => Math.min(10, Math.max(1, v || 7))
 
-      const rows: Omit<Player, 'id'>[] = []
+      const rows: PlayerPayload[] = []
       for (let i = 1; i < lines.length; i++) {
         const c = lines[i].split(',').map((s) => s.trim())
         const name = c[idx('name')] ?? c[idx('player name')]
         if (!name || name.toLowerCase() === 'average') continue
-        const row: Omit<Player, 'id'> = {
+        const row: PlayerPayload = {
           name,
           pace:      clamp(Number(c[idx('pace')])),
           shooting:  clamp(Number(c[idx('shooting')])),
@@ -234,6 +236,7 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
           defending: clamp(Number(c[idx('defending')])),
           physique:  clamp(Number(c[idx('physique')])),
           morale:    clamp(Number(c[idx('morale')])),
+          retired:   false,
         }
         // skip rows with no real data
         if (Object.values(row).slice(1).some((v) => isNaN(v as number))) continue
@@ -268,7 +271,7 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add player</DialogTitle></DialogHeader>
-            <PlayerForm onSubmit={onAdd} onClose={() => setAddOpen(false)} />
+            <PlayerForm onSubmit={(data) => onAdd({ ...data, retired: false })} onClose={() => setAddOpen(false)} />
           </DialogContent>
         </Dialog>
       </div>
@@ -306,7 +309,7 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
           </table>
         </div>
         <div className="px-4 py-2 border-t border-slate-100 text-xs text-slate-400">
-          {players.length} players
+          {visiblePlayers.length} active players
         </div>
       </div>
 
@@ -317,7 +320,7 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
             <PlayerForm
               key={editingPlayer.id}
               defaultValues={playerToFormData(editingPlayer)}
-              onSubmit={(data) => onUpdate(editingPlayer.id, data)}
+              onSubmit={(data) => onUpdate(editingPlayer.id, { ...data, retired: editingPlayer.retired })}
               onClose={() => setEditingPlayer(null)}
             />
           </DialogContent>

@@ -32,6 +32,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('stats')
   const [activeSession, setActiveSession] = useState<(Session & { games: Game[] }) | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
+  const activePlayers = players.filter((player) => !player.retired)
 
   useEffect(() => {
     if (!loggedIn) return
@@ -66,6 +67,14 @@ export default function App() {
   const handleUpdate = async (id: string, data: Omit<Player, 'id'>) => {
     const updated = await api.updatePlayer(id, data)
     setPlayers((prev) => prev.map((p) => (p.id === id ? updated : p)))
+    if (updated.retired) {
+      setSelected((prev) => prev.filter((selectedId) => selectedId !== id))
+      setLockedTeams((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+    }
   }
 
   const handleDelete = async (id: string) => {
@@ -92,7 +101,7 @@ export default function App() {
   }
 
   const handleGenerate = async (locksOverride?: LockedTeams) => {
-    const selectedPlayers = players.filter((p) => selected.includes(p.id))
+    const selectedPlayers = activePlayers.filter((p) => selected.includes(p.id))
     const selectedLocks = Object.fromEntries(
       Object.entries(locksOverride ?? lockedTeams).filter(([playerId]) => selected.includes(playerId))
     )
@@ -179,7 +188,7 @@ export default function App() {
             <h1 className="text-lg font-bold leading-tight">Team Splitter</h1>
             <p className="text-emerald-200 text-xs">
               {loggedIn
-                ? (playersLoading ? 'Loading…' : `${players.length} players in roster`)
+                ? (playersLoading ? 'Loading…' : `${activePlayers.length} active players`)
                 : 'Viewing stats'}
             </p>
           </div>
@@ -215,7 +224,7 @@ export default function App() {
           <>
             {activeTab === 'teams' && (
               <TeamsTab
-                players={players}
+                players={activePlayers}
                 selected={selected}
                 onSelectionChange={handleSelectionChange}
                 lockedTeams={lockedTeams}
@@ -242,7 +251,7 @@ export default function App() {
             )}
             {activeTab === 'manage' && (
               <ManageTab
-                players={players}
+                players={activePlayers}
                 onAdd={handleAdd}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
