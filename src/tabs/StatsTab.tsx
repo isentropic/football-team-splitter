@@ -485,7 +485,7 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
   return (
     <div className="flex flex-col gap-4">
       {/* View toggle */}
-      <div className="flex gap-1 bg-slate-200 rounded-xl p-1">
+      <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
         {(['overall', 'sessions', 'monthly'] as LeaderboardView[]).map((v) => (
           <button
             key={v}
