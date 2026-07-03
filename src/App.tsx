@@ -8,7 +8,7 @@ import { LoginScreen } from '@/components/LoginScreen'
 import { cn } from '@/lib/utils'
 import { isLoggedIn, clearToken } from '@/lib/auth'
 import * as api from '@/lib/api'
-import type { Player, SplitVariant, Session, Game } from '@/lib/types'
+import type { Player, SplitVariant, Session, Game, LockedTeams } from '@/lib/types'
 
 const ACTIVE_SESSION_KEY = 'fts-active-session'
 
@@ -26,11 +26,13 @@ export default function App() {
   const [players, setPlayers] = useState<Player[]>([])
   const [playersLoading, setPlayersLoading] = useState(true)
   const [selected, setSelected] = useState<string[]>([])
+  const [lockedTeams, setLockedTeams] = useState<LockedTeams>({})
   const [variants, setVariants] = useState<SplitVariant[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [activeTab, setActiveTab] = useState<Tab>('stats')
   const [activeSession, setActiveSession] = useState<(Session & { games: Game[] }) | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
+  const activePlayers = players.filter((player) => !player.retired)
 
   useEffect(() => {
     if (!loggedIn) return
@@ -65,12 +67,25 @@ export default function App() {
   const handleUpdate = async (id: string, data: Omit<Player, 'id'>) => {
     const updated = await api.updatePlayer(id, data)
     setPlayers((prev) => prev.map((p) => (p.id === id ? updated : p)))
+    if (updated.retired) {
+      setSelected((prev) => prev.filter((selectedId) => selectedId !== id))
+      setLockedTeams((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+    }
   }
 
   const handleDelete = async (id: string) => {
     await api.deletePlayer(id)
     setPlayers((prev) => prev.filter((p) => p.id !== id))
     setSelected((prev) => prev.filter((s) => s !== id))
+    setLockedTeams((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
   }
 
   const handleImport = async (rows: Omit<Player, 'id'>[]) => {
@@ -78,14 +93,24 @@ export default function App() {
     setPlayers((prev) => [...prev, ...created].sort((a, b) => a.name.localeCompare(b.name)))
   }
 
-  const handleGenerate = async () => {
-    const selectedPlayers = players.filter((p) => selected.includes(p.id))
+  const handleSelectionChange = (ids: string[]) => {
+    setSelected(ids)
+    setLockedTeams((prev) => Object.fromEntries(
+      Object.entries(prev).filter(([playerId]) => ids.includes(playerId))
+    ))
+  }
+
+  const handleGenerate = async (locksOverride?: LockedTeams) => {
+    const selectedPlayers = activePlayers.filter((p) => selected.includes(p.id))
+    const selectedLocks = Object.fromEntries(
+      Object.entries(locksOverride ?? lockedTeams).filter(([playerId]) => selected.includes(playerId))
+    )
     setIsGenerating(true)
     try {
       const res = await fetch('/api/split', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ players: selectedPlayers }),
+        body: JSON.stringify({ players: selectedPlayers, locks: selectedLocks }),
       })
       const data = await res.json() as { variants: SplitVariant[] }
       setVariants(data.variants ?? [])
@@ -155,22 +180,22 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-slate-100">
-      <header className="bg-emerald-600 text-white px-4 pt-12 pb-4 shadow-md">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">⚽</span>
+    <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-[#fafafa]">
+      <header className="app-header-premium-pitch relative overflow-hidden px-4 pt-12 pb-4 text-white shadow-[0_14px_35px_rgba(5,46,22,0.18)]">
+        <div className="relative flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/18 text-2xl shadow-sm backdrop-blur-md">⚽</span>
           <div className="flex-1">
-            <h1 className="text-lg font-bold leading-tight">Team Splitter</h1>
-            <p className="text-emerald-200 text-xs">
+            <h1 className="text-lg font-bold leading-tight text-white drop-shadow-[0_1px_1px_rgba(5,46,22,0.35)]">Team Splitter</h1>
+            <p className="text-lime-50/80 text-xs">
               {loggedIn
-                ? (playersLoading ? 'Loading…' : `${players.length} players in roster`)
+                ? (playersLoading ? 'Loading…' : `${activePlayers.length} active players`)
                 : 'Viewing stats'}
             </p>
           </div>
           {loggedIn ? (
             <button
               onClick={handleLogout}
-              className="p-2 rounded-xl hover:bg-emerald-700 transition-colors text-emerald-200 hover:text-white"
+              className="p-2 rounded-xl border border-white/15 bg-white/12 text-white/80 backdrop-blur-md transition-colors hover:bg-white/22 hover:text-white"
               title="Sign out"
             >
               <LogOut className="h-4 w-4" />
@@ -178,7 +203,7 @@ export default function App() {
           ) : (
             <button
               onClick={() => setActiveTab('teams')}
-              className="text-xs text-emerald-200 hover:text-white px-2 py-1 rounded-lg hover:bg-emerald-700 transition-colors"
+              className="rounded-lg border border-white/15 bg-white/12 px-2 py-1 text-xs text-white/80 backdrop-blur-md transition-colors hover:bg-white/22 hover:text-white"
             >
               Admin login
             </button>
@@ -199,9 +224,11 @@ export default function App() {
           <>
             {activeTab === 'teams' && (
               <TeamsTab
-                players={players}
+                players={activePlayers}
                 selected={selected}
-                onSelectionChange={setSelected}
+                onSelectionChange={handleSelectionChange}
+                lockedTeams={lockedTeams}
+                onLockedTeamsChange={setLockedTeams}
                 variants={variants}
                 isGenerating={isGenerating}
                 onGenerate={handleGenerate}
@@ -224,7 +251,7 @@ export default function App() {
             )}
             {activeTab === 'manage' && (
               <ManageTab
-                players={players}
+                players={activePlayers}
                 onAdd={handleAdd}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}

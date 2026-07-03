@@ -17,8 +17,12 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   if (denied) return denied
 
   const body = await ctx.request.json() as { teams: { color: string; playerIds: string[] }[] }
-  if (!Array.isArray(body.teams) || body.teams.length !== 3) {
-    return Response.json({ error: 'Expected 3 teams' }, { status: 400 })
+  if (!Array.isArray(body.teams) || ![3, 4].includes(body.teams.length)) {
+    return Response.json({ error: 'Expected 3 or 4 teams' }, { status: 400 })
+  }
+  const colors = new Set(body.teams.map((t) => t.color))
+  if (colors.size !== body.teams.length) {
+    return Response.json({ error: 'Team colors must be unique' }, { status: 400 })
   }
 
   const id = crypto.randomUUID()

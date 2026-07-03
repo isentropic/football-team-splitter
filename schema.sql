@@ -9,5 +9,6 @@ CREATE TABLE players (
   dribbling REAL NOT NULL DEFAULT 5,
   defending REAL NOT NULL DEFAULT 5,
   physique  REAL NOT NULL DEFAULT 5,
-  morale    REAL NOT NULL DEFAULT 5
+  morale    REAL NOT NULL DEFAULT 5,
+  retired   INTEGER NOT NULL DEFAULT 0
 );

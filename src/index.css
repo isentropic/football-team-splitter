@@ -6,9 +6,57 @@
   }
   body {
     margin: 0;
-    background-color: #f1f5f9;
+    background-color: #fafafa;
     color: #0f172a;
     font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
     -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  .app-header-premium-pitch {
+    isolation: isolate;
+    background:
+      radial-gradient(115% 145% at 9% 3%, rgba(217, 249, 157, 0.86) 0%, rgba(217, 249, 157, 0.42) 22%, transparent 48%),
+      radial-gradient(90% 120% at 72% 86%, rgba(163, 230, 53, 0.38) 0%, rgba(34, 197, 94, 0.2) 37%, transparent 67%),
+      radial-gradient(72% 90% at 104% 34%, rgba(56, 189, 248, 0.18) 0%, rgba(56, 189, 248, 0.08) 28%, transparent 62%),
+      radial-gradient(130% 120% at 38% 120%, rgba(6, 78, 59, 0.42) 0%, rgba(6, 78, 59, 0.14) 45%, transparent 74%),
+      linear-gradient(128deg, #0f5f3f 0%, #12824c 34%, #22a85a 66%, #5ccf72 100%);
+  }
+
+  .app-header-premium-pitch::before,
+  .app-header-premium-pitch::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .app-header-premium-pitch::before {
+    z-index: -1;
+    opacity: 0.7;
+    background:
+      radial-gradient(circle at 12% 18%, rgba(246, 245, 239, 0.38) 0 0.45px, transparent 0.9px),
+      radial-gradient(circle at 31% 64%, rgba(246, 245, 239, 0.28) 0 0.8px, transparent 1.35px),
+      radial-gradient(circle at 58% 35%, rgba(246, 245, 239, 0.22) 0 1.05px, transparent 1.7px),
+      radial-gradient(circle at 84% 72%, rgba(246, 245, 239, 0.18) 0 0.65px, transparent 1.15px);
+    background-size: 7px 7px, 11px 11px, 14px 14px, 9px 9px;
+    background-position: 0 0, 4px 6px, 9px 2px, 2px 7px;
+    mask-image:
+      radial-gradient(84% 120% at 46% 60%, #000 0%, rgba(0, 0, 0, 0.76) 28%, rgba(0, 0, 0, 0.42) 53%, transparent 82%),
+      linear-gradient(108deg, transparent 0%, #000 16%, #000 78%, transparent 100%);
+    mask-composite: intersect;
+  }
+
+  .app-header-premium-pitch::after {
+    z-index: -1;
+    opacity: 0.5;
+    background:
+      repeating-linear-gradient(171deg, rgba(246, 245, 239, 0.16) 0 1px, transparent 1px 10px),
+      radial-gradient(120% 80% at 15% 82%, rgba(6, 78, 59, 0.24), transparent 58%),
+      radial-gradient(86% 88% at 73% 24%, rgba(217, 249, 157, 0.3), transparent 62%),
+      radial-gradient(55% 75% at 103% 42%, rgba(56, 189, 248, 0.18), transparent 70%);
+    filter: saturate(1.2) contrast(1.08);
+    mix-blend-mode: soft-light;
   }
 }

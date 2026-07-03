@@ -22,18 +22,62 @@ const TEAM_META: Record<string, { bg: string; light: string; text: string; borde
   orange: { bg: 'bg-orange-500', light: 'bg-orange-50',  text: 'text-orange-700',  border: 'border-orange-200' },
   blue:   { bg: 'bg-blue-500',   light: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200'   },
   green:  { bg: 'bg-emerald-500',light: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200'},
+  white:  { bg: 'bg-white border border-slate-300', light: 'bg-white', text: 'text-slate-700', border: 'border-slate-200' },
 }
 const teamMeta = (color: string) => TEAM_META[color] ?? TEAM_META['orange']
 
-const MATCHUPS: [string, string][] = [['orange', 'blue'], ['orange', 'green'], ['blue', 'green']]
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+const matchupKey = (matchup: [string, string]) => `${matchup[0]}-${matchup[1]}`
+const allMatchups = (colors: string[]): [string, string][] =>
+  colors.flatMap((first, i) => colors.slice(i + 1).map((second) => [first, second] as [string, string]))
+
+function suggestNextMatchup(session: Session & { games: Game[] }): [string, string] | null {
+  const order = session.teams.map((team) => team.color)
+  if (order.length < 2) return null
+
+  let queue = [...order]
+  const streak: Record<string, number> = Object.fromEntries(order.map((color) => [color, 0]))
+  let lastParticipants = new Set<string>()
+
+  for (const game of session.games) {
+    if (!order.includes(game.team1) || !order.includes(game.team2)) continue
+
+    const participants = [game.team1, game.team2] as const
+    for (const color of order) {
+      streak[color] = participants.includes(color)
+        ? (lastParticipants.has(color) ? streak[color] + 1 : 1)
+        : 0
+    }
+
+    const t1Streak = streak[game.team1]
+    const t2Streak = streak[game.team2]
+    let outgoing: string
+    if (game.score1 === game.score2) {
+      outgoing = t1Streak >= t2Streak ? game.team1 : game.team2
+    } else {
+      const winner = game.score1 > game.score2 ? game.team1 : game.team2
+      const loser = winner === game.team1 ? game.team2 : game.team1
+      outgoing = order.length >= 4 && streak[winner] >= 3 ? winner : loser
+    }
+
+    const staying = outgoing === game.team1 ? game.team2 : game.team1
+    const waiting = queue.filter((color) => color !== game.team1 && color !== game.team2)
+    queue = [staying, ...waiting, outgoing]
+    lastParticipants = new Set(participants)
+  }
+
+  return [queue[0], queue[1]]
+}
 
 function formatDate(ts: number) {
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-function ScoreEntry({ team1, team2, onRecord }: {
-  team1: string; team2: string; onRecord: (s1: number, s2: number) => Promise<void>
+function RecordGameDialog({ team1, team2, onRecord, onClose }: {
+  team1: string
+  team2: string
+  onRecord: (s1: number, s2: number) => Promise<void>
+  onClose: () => void
 }) {
   const [s1, setS1] = useState(0)
   const [s2, setS2] = useState(0)
@@ -46,28 +90,42 @@ function ScoreEntry({ team1, team2, onRecord }: {
 
   const submit = async () => {
     setSaving(true)
-    try { await onRecord(s1, s2) } finally { setSaving(false) }
+    try { await onRecord(s1, s2); onClose() } finally { setSaving(false) }
   }
 
   return (
-    <div className="flex items-center gap-2 mt-2 bg-slate-50 rounded-xl p-3 border border-slate-200">
-      <span className={cn('text-sm font-bold w-14 text-center', m1.text)}>{capitalize(team1)}</span>
-      <div className="flex items-center gap-1">
-        <button className="h-7 w-7 rounded-full bg-slate-200 hover:bg-slate-300 text-sm font-bold" onClick={() => adj(setS1, -1)}>−</button>
-        <span className="w-6 text-center text-lg font-bold text-slate-800">{s1}</span>
-        <button className="h-7 w-7 rounded-full bg-slate-200 hover:bg-slate-300 text-sm font-bold" onClick={() => adj(setS1, 1)}>+</button>
-      </div>
-      <span className="text-slate-400 font-semibold">–</span>
-      <div className="flex items-center gap-1">
-        <button className="h-7 w-7 rounded-full bg-slate-200 hover:bg-slate-300 text-sm font-bold" onClick={() => adj(setS2, -1)}>−</button>
-        <span className="w-6 text-center text-lg font-bold text-slate-800">{s2}</span>
-        <button className="h-7 w-7 rounded-full bg-slate-200 hover:bg-slate-300 text-sm font-bold" onClick={() => adj(setS2, 1)}>+</button>
-      </div>
-      <span className={cn('text-sm font-bold w-14 text-center', m2.text)}>{capitalize(team2)}</span>
-      <Button size="sm" className="ml-auto" disabled={saving} onClick={submit}>
-        {saving ? '…' : 'Record'}
-      </Button>
-    </div>
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Record game</DialogTitle>
+        </DialogHeader>
+        <div className="flex items-center justify-center gap-4 py-4">
+          <div className="flex flex-col items-center gap-2">
+            <span className={cn('text-sm font-bold', m1.text)}>{capitalize(team1)}</span>
+            <div className="flex items-center gap-2">
+              <button className="h-9 w-9 rounded-full bg-slate-100 hover:bg-slate-200 text-lg font-bold" onClick={() => adj(setS1, -1)}>−</button>
+              <span className="w-10 text-center text-3xl font-bold text-slate-800">{s1}</span>
+              <button className="h-9 w-9 rounded-full bg-slate-100 hover:bg-slate-200 text-lg font-bold" onClick={() => adj(setS1, 1)}>+</button>
+            </div>
+          </div>
+          <span className="text-slate-400 text-xl font-semibold">–</span>
+          <div className="flex flex-col items-center gap-2">
+            <span className={cn('text-sm font-bold', m2.text)}>{capitalize(team2)}</span>
+            <div className="flex items-center gap-2">
+              <button className="h-9 w-9 rounded-full bg-slate-100 hover:bg-slate-200 text-lg font-bold" onClick={() => adj(setS2, -1)}>−</button>
+              <span className="w-10 text-center text-3xl font-bold text-slate-800">{s2}</span>
+              <button className="h-9 w-9 rounded-full bg-slate-100 hover:bg-slate-200 text-lg font-bold" onClick={() => adj(setS2, 1)}>+</button>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button className="flex-1" disabled={saving} onClick={submit}>
+            {saving ? '…' : 'Record'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -158,6 +216,8 @@ function SessionHistory({ sessions }: { sessions: Session[] }) {
 
 export function GamesTab({ activeSession, sessions, players, onRecordGame, onUpdateGame, onDeleteGame, onRefresh, onEndSession, onNewSession }: Props) {
   const [activeMatchup, setActiveMatchup] = useState<[string, string] | null>(null)
+  const [scoringMatchup, setScoringMatchup] = useState<[string, string] | null>(null)
+  const [showManualMatchups, setShowManualMatchups] = useState(false)
   const [editingGame, setEditingGame] = useState<Game | null>(null)
   const [deletingGameId, setDeletingGameId] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -184,10 +244,15 @@ export function GamesTab({ activeSession, sessions, players, onRecordGame, onUpd
   }
 
   const playerMap = Object.fromEntries(players.map((p) => [p.id, p]))
+  const matchups = allMatchups(activeSession.teams.map((team) => team.color))
+  const suggestedMatchup = suggestNextMatchup(activeSession)
+  const selectedMatchup = activeMatchup ?? suggestedMatchup
 
   const handleRecord = async (t1: string, t2: string, s1: number, s2: number) => {
     await onRecordGame(activeSession.id, { team1: t1, score1: s1, team2: t2, score2: s2 })
     setActiveMatchup(null)
+    setScoringMatchup(null)
+    setShowManualMatchups(false)
   }
 
   return (
@@ -222,7 +287,7 @@ export function GamesTab({ activeSession, sessions, players, onRecordGame, onUpd
                         <span className={cn('h-4 w-4 rounded-full flex items-center justify-center text-white text-[9px] font-bold', m.bg)}>
                           {initials(p.name)[0]}
                         </span>
-                        {p.name.split(' ')[0]}
+                        {p.name}
                       </span>
                     )
                   })}
@@ -235,33 +300,71 @@ export function GamesTab({ activeSession, sessions, players, onRecordGame, onUpd
 
       <div className="flex flex-col gap-2">
         <p className="text-sm font-semibold text-slate-700">Record a game</p>
-        {MATCHUPS.map(([t1, t2]) => {
-          const isActive = activeMatchup?.[0] === t1 && activeMatchup?.[1] === t2
-          const m1 = teamMeta(t1)
-          const m2 = teamMeta(t2)
-          return (
-            <div key={`${t1}-${t2}`}>
-              <button
-                className={cn(
-                  'w-full flex items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-medium transition-colors',
-                  isActive ? 'border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white hover:bg-slate-50'
-                )}
-                onClick={() => setActiveMatchup(isActive ? null : [t1, t2])}
-              >
-                <span className={cn('font-semibold', m1.text)}>{capitalize(t1)}</span>
-                <span className="text-slate-400">vs</span>
-                <span className={cn('font-semibold', m2.text)}>{capitalize(t2)}</span>
-              </button>
-              {isActive && (
-                <ScoreEntry
-                  team1={t1}
-                  team2={t2}
-                  onRecord={(s1, s2) => handleRecord(t1, t2, s1, s2)}
-                />
-              )}
+        {selectedMatchup && (
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
+              {activeMatchup ? 'Selected' : 'Suggested'}
+            </span>
+            <button
+              className="inline-flex h-10 w-52 max-w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-emerald-300 hover:bg-emerald-50"
+              onClick={() => setScoringMatchup(selectedMatchup)}
+            >
+              <span className={cn('font-semibold', teamMeta(selectedMatchup[0]).text)}>{capitalize(selectedMatchup[0])}</span>
+              <span className="text-slate-400">vs</span>
+              <span className={cn('font-semibold', teamMeta(selectedMatchup[1]).text)}>{capitalize(selectedMatchup[1])}</span>
+            </button>
+          </div>
+        )}
+
+        <div className="flex justify-center">
+          <button
+            className="inline-flex h-10 w-52 max-w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+            onClick={() => setShowManualMatchups(true)}
+          >
+            Choose another game
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </div>
+        <Dialog open={showManualMatchups} onOpenChange={setShowManualMatchups}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Choose game</DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-1 gap-2">
+            {matchups.map(([t1, t2]) => {
+              const isSelected = selectedMatchup?.[0] === t1 && selectedMatchup?.[1] === t2
+              return (
+                <button
+                  key={`${t1}-${t2}`}
+                  className={cn(
+                    'w-full flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-semibold transition-colors',
+                    isSelected ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white hover:bg-slate-50'
+                  )}
+                  onClick={() => {
+                    const matchup = [t1, t2] as [string, string]
+                    setActiveMatchup(matchup)
+                    setShowManualMatchups(false)
+                    setScoringMatchup(matchup)
+                  }}
+                >
+                  <span className={cn('font-semibold', teamMeta(t1).text)}>{capitalize(t1)}</span>
+                  <span className="text-slate-400">vs</span>
+                  <span className={cn('font-semibold', teamMeta(t2).text)}>{capitalize(t2)}</span>
+                </button>
+              )
+            })}
             </div>
-          )
-        })}
+          </DialogContent>
+        </Dialog>
+        {scoringMatchup && (
+          <RecordGameDialog
+            key={matchupKey(scoringMatchup)}
+            team1={scoringMatchup[0]}
+            team2={scoringMatchup[1]}
+            onRecord={(s1, s2) => handleRecord(scoringMatchup[0], scoringMatchup[1], s1, s2)}
+            onClose={() => setScoringMatchup(null)}
+          />
+        )}
       </div>
 
       {activeSession.games.length > 0 && (

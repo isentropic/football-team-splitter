@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Trophy, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { TeamAdjuster } from '@/components/TeamAdjuster'
 import { cn, initials, statBg } from '@/lib/utils'
 import type { SplitVariant, Team } from '@/lib/types'
 
@@ -10,8 +9,9 @@ interface Props {
   variants: SplitVariant[]
   isLoading: boolean
   onRegenerate: () => void
+  fixedCount: number
   hasSelection: boolean
-  onLockTeams: (variant: SplitVariant) => void
+  onUseTeams: (variant: SplitVariant) => void
   hasActiveSession?: boolean
 }
 
@@ -19,6 +19,7 @@ const TEAM_COLORS: Record<string, { bg: string; light: string; text: string; bor
   orange: { bg: 'bg-orange-500', light: 'bg-orange-50',  text: 'text-orange-700',  border: 'border-orange-200' },
   blue:   { bg: 'bg-blue-500',   light: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200'   },
   green:  { bg: 'bg-emerald-500',light: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200'},
+  white:  { bg: 'bg-white border border-slate-300', light: 'bg-white', text: 'text-slate-700', border: 'border-slate-200' },
 }
 const colorFor = (color: string) => TEAM_COLORS[color] ?? TEAM_COLORS['orange']
 
@@ -52,12 +53,10 @@ function VariantCard({ variant, index, defaultOpen, onUseTeams, hasActiveSession
   hasActiveSession?: boolean
 }) {
   const [expanded, setExpanded] = useState(defaultOpen)
-  const [adjusting, setAdjusting] = useState(false)
 
   const handleUse = (e: React.MouseEvent) => {
     e.stopPropagation()
-    setAdjusting(true)
-    if (!expanded) setExpanded(true)
+    onUseTeams(variant)
   }
 
   return (
@@ -74,24 +73,22 @@ function VariantCard({ variant, index, defaultOpen, onUseTeams, hasActiveSession
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {!adjusting && (
-            <span
-              className={cn(
-                'text-xs font-medium px-2 py-0.5 rounded-full border',
-                hasActiveSession
-                  ? 'text-slate-400 border-slate-200 cursor-not-allowed'
-                  : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50 cursor-pointer'
-              )}
-              onClick={hasActiveSession ? undefined : handleUse}
-            >
-              {hasActiveSession ? 'Session active' : 'Use these teams'}
-            </span>
-          )}
+          <span
+            className={cn(
+              'text-xs font-medium px-2 py-0.5 rounded-full border',
+              hasActiveSession
+                ? 'text-slate-400 border-slate-200 cursor-not-allowed'
+                : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50 cursor-pointer'
+            )}
+            onClick={hasActiveSession ? undefined : handleUse}
+          >
+            {hasActiveSession ? 'Session active' : 'Use these teams'}
+          </span>
           {expanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
         </div>
       </button>
 
-      {expanded && !adjusting && (
+      {expanded && (
         <div className="px-4 pb-4 flex flex-col gap-3">
           {variant.teams.map((team) => {
             const color = colorFor(team.color)
@@ -108,7 +105,7 @@ function VariantCard({ variant, index, defaultOpen, onUseTeams, hasActiveSession
                       <span className={cn('h-4 w-4 rounded-full flex items-center justify-center text-white text-[9px] font-bold', color.bg)}>
                         {initials(p.name)[0]}
                       </span>
-                      {p.name.split(' ')[0]}
+                      {p.name}
                     </span>
                   ))}
                 </div>
@@ -125,21 +122,11 @@ function VariantCard({ variant, index, defaultOpen, onUseTeams, hasActiveSession
           </Button>
         </div>
       )}
-
-      {expanded && adjusting && (
-        <div className="px-4 pb-4">
-          <TeamAdjuster
-            variant={variant}
-            onConfirm={(v) => { setAdjusting(false); onUseTeams(v) }}
-            onCancel={() => setAdjusting(false)}
-          />
-        </div>
-      )}
     </Card>
   )
 }
 
-export function SplitTab({ variants, isLoading, onRegenerate, hasSelection, onLockTeams, hasActiveSession }: Props) {
+export function SplitTab({ variants, isLoading, onRegenerate, fixedCount, hasSelection, onUseTeams, hasActiveSession }: Props) {
   if (!hasSelection) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
@@ -172,13 +159,19 @@ export function SplitTab({ variants, isLoading, onRegenerate, hasSelection, onLo
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">Top {variants.length} balanced splits</p>
+        <div>
+          <p className="text-sm text-slate-500">Top {variants.length} balanced splits</p>
+          {fixedCount > 0 && (
+            <p className="text-xs text-emerald-600 font-medium">{fixedCount} fixed player{fixedCount === 1 ? '' : 's'} applied</p>
+          )}
+        </div>
         <Button variant="outline" size="sm" onClick={onRegenerate} className="gap-1.5">
-          <RefreshCw className="h-3.5 w-3.5" />Regenerate
+          <RefreshCw className="h-3.5 w-3.5" />
+          {fixedCount > 0 ? 'Regenerate with fixes' : 'Regenerate'}
         </Button>
       </div>
       {variants.map((v, i) => (
-        <VariantCard key={v.id} variant={v} index={i} defaultOpen={i === 0} onUseTeams={onLockTeams} hasActiveSession={hasActiveSession} />
+        <VariantCard key={v.id} variant={v} index={i} defaultOpen={i === 0} onUseTeams={onUseTeams} hasActiveSession={hasActiveSession} />
       ))}
     </div>
   )

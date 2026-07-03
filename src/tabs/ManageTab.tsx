@@ -27,6 +27,7 @@ const schema = z.object({
   morale:     stat,
 })
 type FormData = z.infer<typeof schema>
+type PlayerPayload = Omit<Player, 'id'>
 
 const STATS: { key: keyof Omit<FormData, 'name'>; label: string }[] = [
   { key: 'pace',      label: 'Pace' },
@@ -45,6 +46,29 @@ const avatarColors = [
 const colorFor = (name: string) => avatarColors[name.charCodeAt(0) % avatarColors.length]
 
 const DEFAULT_STATS: Omit<FormData, 'name'> = { pace:7, shooting:7, passing:7, dribbling:7, defending:7, physique:7, morale:7 }
+
+const normalizeRating = (value: unknown) => {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return 7
+  return Math.min(10, Math.max(1, Math.round(numeric * 2) / 2))
+}
+
+const playerToFormData = (player: Player): FormData => ({
+  name: player.name,
+  pace: normalizeRating(player.pace),
+  shooting: normalizeRating(player.shooting),
+  passing: normalizeRating(player.passing),
+  dribbling: normalizeRating(player.dribbling),
+  defending: normalizeRating(player.defending),
+  physique: normalizeRating(player.physique),
+  morale: normalizeRating(player.morale),
+})
+
+const formatRating = (value: unknown) => {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return '-'
+  return numeric.toFixed(1).replace(/\.0$/, '')
+}
 
 function PlayerForm({ defaultValues, onSubmit, onClose }: {
   defaultValues?: FormData
@@ -101,10 +125,10 @@ function PlayerForm({ defaultValues, onSubmit, onClose }: {
 
 interface Props {
   players: Player[]
-  onAdd: (data: Omit<Player, 'id'>) => Promise<void>
-  onUpdate: (id: string, data: Omit<Player, 'id'>) => Promise<void>
+  onAdd: (data: PlayerPayload) => Promise<void>
+  onUpdate: (id: string, data: PlayerPayload) => Promise<void>
   onDelete: (id: string) => Promise<void>
-  onImport: (players: Omit<Player, 'id'>[]) => Promise<void>
+  onImport: (players: PlayerPayload[]) => Promise<void>
 }
 
 export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Props) {
@@ -116,6 +140,7 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
   const [deleting, setDeleting] = useState(false)
   const [importing, setImporting] = useState(false)
   const csvRef = useRef<HTMLInputElement>(null)
+  const visiblePlayers = players.filter((player) => !player.retired)
 
   const colDef = (key: keyof Player, label: string): ColumnDef<Player> => ({
     accessorKey: key,
@@ -124,7 +149,10 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
         {label} <ArrowUpDown className="h-3 w-3" />
       </button>
     ),
-    cell: ({ getValue }) => <span className={cn('text-xs font-semibold', statColor(getValue() as number))}>{getValue() as number}</span>,
+    cell: ({ getValue }) => {
+      const value = Number(getValue())
+      return <span className={cn('text-xs font-semibold', statColor(value))}>{formatRating(value)}</span>
+    },
   })
 
   const columns: ColumnDef<Player>[] = [
@@ -168,7 +196,7 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
   ]
 
   const table = useReactTable({
-    data: players, columns,
+    data: visiblePlayers, columns,
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
@@ -194,12 +222,12 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
       const idx = (n: string) => header.findIndex((h) => h === n)
       const clamp = (v: number) => Math.min(10, Math.max(1, v || 7))
 
-      const rows: Omit<Player, 'id'>[] = []
+      const rows: PlayerPayload[] = []
       for (let i = 1; i < lines.length; i++) {
         const c = lines[i].split(',').map((s) => s.trim())
         const name = c[idx('name')] ?? c[idx('player name')]
         if (!name || name.toLowerCase() === 'average') continue
-        const row: Omit<Player, 'id'> = {
+        const row: PlayerPayload = {
           name,
           pace:      clamp(Number(c[idx('pace')])),
           shooting:  clamp(Number(c[idx('shooting')])),
@@ -208,6 +236,7 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
           defending: clamp(Number(c[idx('defending')])),
           physique:  clamp(Number(c[idx('physique')])),
           morale:    clamp(Number(c[idx('morale')])),
+          retired:   false,
         }
         // skip rows with no real data
         if (Object.values(row).slice(1).some((v) => isNaN(v as number))) continue
@@ -242,7 +271,7 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add player</DialogTitle></DialogHeader>
-            <PlayerForm onSubmit={onAdd} onClose={() => setAddOpen(false)} />
+            <PlayerForm onSubmit={(data) => onAdd({ ...data, retired: false })} onClose={() => setAddOpen(false)} />
           </DialogContent>
         </Dialog>
       </div>
@@ -263,7 +292,7 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
             </thead>
             <tbody>
               {table.getRowModel().rows.length === 0 && (
-                <tr><td colSpan={columns.length} className="text-center text-slate-400 py-10 text-sm">No players yet.</td></tr>
+                <tr><td colSpan={columns.length} className="text-center text-slate-400 py-10 text-sm">No players.</td></tr>
               )}
               {table.getRowModel().rows.map((row) => (
                 <tr
@@ -279,21 +308,24 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-2 border-t border-slate-100 text-xs text-slate-400">{players.length} players</div>
+        <div className="px-4 py-2 border-t border-slate-100 text-xs text-slate-400">
+          {visiblePlayers.length} active players
+        </div>
       </div>
 
-      <Dialog open={!!editingPlayer} onOpenChange={(o) => !o && setEditingPlayer(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Edit player</DialogTitle></DialogHeader>
-          {editingPlayer && (
+      {editingPlayer && (
+        <Dialog open onOpenChange={(o) => !o && setEditingPlayer(null)}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Edit player</DialogTitle></DialogHeader>
             <PlayerForm
-              defaultValues={editingPlayer}
-              onSubmit={(data) => onUpdate(editingPlayer.id, data)}
+              key={editingPlayer.id}
+              defaultValues={playerToFormData(editingPlayer)}
+              onSubmit={(data) => onUpdate(editingPlayer.id, { ...data, retired: editingPlayer.retired })}
               onClose={() => setEditingPlayer(null)}
             />
-          )}
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Dialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <DialogContent>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BarChart2, Medal, Pencil, ChevronLeft, ChevronRight, Layers } from 'lucide-react'
+import { BarChart2, Medal, Pencil, Layers } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -11,16 +11,19 @@ const TEAM_TEXT: Record<string, string> = {
   orange: 'text-orange-600',
   blue:   'text-blue-600',
   green:  'text-emerald-600',
+  white:  'text-slate-700',
 }
 const TEAM_BG: Record<string, string> = {
   orange: 'bg-orange-500',
   blue:   'bg-blue-500',
   green:  'bg-emerald-500',
+  white:  'bg-white border border-slate-300',
 }
 const TEAM_LIGHT: Record<string, string> = {
   orange: 'bg-orange-50',
   blue:   'bg-blue-50',
   green:  'bg-emerald-50',
+  white:  'bg-white',
 }
 const teamText  = (c: string) => TEAM_TEXT[c]  ?? 'text-slate-700'
 const teamBg    = (c: string) => TEAM_BG[c]    ?? 'bg-slate-400'
@@ -29,11 +32,6 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 function formatDayLabel(ts: number) {
   return new Date(ts).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-}
-
-function formatMonth(ym: string) {
-  const [y, m] = ym.split('-')
-  return new Date(Number(y), Number(m) - 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
 }
 
 function WinBar({ wins, draws, losses }: { wins: number; draws: number; losses: number }) {
@@ -57,29 +55,9 @@ function MedalIcon({ rank }: { rank: number }) {
   return <span className="text-xs text-slate-400 w-4 text-center">{rank}</span>
 }
 
-const MIN_GAMES = 10
-const OVERALL_MIN = 50
-
-const FAKE_CHARS = 'ABCDEFGHJKLMNPQRSTVWXZ'
-function fakeStr(id: string, offset: number) {
-  let h = offset
-  for (let i = 0; i < id.length; i++) h = (Math.imul(h + 7, 31) + id.charCodeAt(i)) >>> 0
-  return FAKE_CHARS[h % FAKE_CHARS.length] + FAKE_CHARS[(h >>> 5) % FAKE_CHARS.length]
-}
-
-function PlayerLeaderboard({ players, view }: { players: PlayerStat[]; view: 'overall' | 'monthly' }) {
-  const isOverall = view === 'overall'
-
-  const ranked = isOverall
-    ? players.filter((p) => (p.recent_count ?? 0) >= OVERALL_MIN)
-    : players.filter((p) => p.games_played >= MIN_GAMES)
-
-  const pending = isOverall
-    ? players.filter((p) => { const rc = p.recent_count ?? 0; return rc > 0 && rc < OVERALL_MIN })
-    : players.filter((p) => p.games_played > 0 && p.games_played < MIN_GAMES)
-
-  if (ranked.length === 0 && pending.length === 0) {
-    return <p className="text-sm text-slate-400 text-center py-6">No players qualify yet.</p>
+function PlayerLeaderboard({ players }: { players: PlayerStat[] }) {
+  if (players.length === 0) {
+    return <p className="text-sm text-slate-400 text-center py-6">No players yet.</p>
   }
 
   return (
@@ -92,7 +70,7 @@ function PlayerLeaderboard({ players, view }: { players: PlayerStat[]; view: 'ov
         <span className="w-5 text-center text-red-400">L</span>
         <span className="w-10 text-center text-slate-600">PPG</span>
       </div>
-      {ranked.map((p, i) => {
+      {players.map((p, i) => {
         const ppg = p.games_played > 0 ? (p.pts / p.games_played).toFixed(2) : '—'
         return (
           <div
@@ -117,40 +95,6 @@ function PlayerLeaderboard({ players, view }: { players: PlayerStat[]; view: 'ov
           </div>
         )
       })}
-      {isOverall && pending.length > 0 && (
-        <>
-          <div className="flex items-center gap-2 px-3 py-1.5 border-t border-dashed border-slate-200 bg-slate-50/60">
-            <div className="h-px flex-1 bg-slate-200" />
-            <span className="text-[10px] font-semibold text-slate-400 tracking-wide shrink-0">ALMOST THERE</span>
-            <div className="h-px flex-1 bg-slate-200" />
-          </div>
-          {pending.map((p) => {
-            const need = OVERALL_MIN - (p.recent_count ?? 0)
-            return (
-              <div
-                key={p.id}
-                className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-x-2 items-center px-3 py-2.5 border-b border-slate-50 last:border-0"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-slate-300 w-4 text-center text-base leading-none">·</span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-500 truncate">{p.name}</p>
-                    <span className="text-[10px] font-medium text-amber-600">Need {need} more</span>
-                  </div>
-                </div>
-                <span className="w-7 text-center text-xs text-slate-500 blur-sm select-none">{fakeStr(p.id, 1)}</span>
-                <span className="w-5 text-center text-xs font-semibold text-emerald-600 blur-sm select-none">{fakeStr(p.id, 2)}</span>
-                <span className="w-5 text-center text-xs font-semibold text-amber-500 blur-sm select-none">{fakeStr(p.id, 3)}</span>
-                <span className="w-5 text-center text-xs font-semibold text-red-400 blur-sm select-none">{fakeStr(p.id, 4)}</span>
-                <span className="w-10 text-center text-xs font-bold text-slate-700 blur-sm select-none">{fakeStr(p.id, 5)}</span>
-              </div>
-            )
-          })}
-        </>
-      )}
-      {!isOverall && pending.length > 0 && (
-        <p className="text-xs text-slate-400 px-3 pt-2 pb-1">{pending.length} players need {MIN_GAMES}+ games to appear</p>
-      )}
     </div>
   )
 }
@@ -265,7 +209,7 @@ function SessionCard({
 
             {/* Player names */}
             <p className="text-[11px] text-slate-500 mb-2.5 leading-relaxed">
-              {t.playerNames.map((n) => n.split(' ')[0]).join(', ')}
+              {t.playerNames.join(', ')}
             </p>
 
             {/* Raw stats row */}
@@ -409,17 +353,15 @@ function SessionCarousel({
   )
 }
 
-type LeaderboardView = 'overall' | 'sessions' | 'monthly'
+type LeaderboardView = 'overall' | 'recent' | 'sessions'
 
 interface StatsTabProps {
   loggedIn?: boolean
 }
 
 export function StatsTab({ loggedIn = false }: StatsTabProps) {
-  const [view, setView] = useState<LeaderboardView>('overall')
+  const [view, setView] = useState<LeaderboardView>('recent')
   const [players, setPlayers] = useState<PlayerStat[]>([])
-  const [availableMonths, setAvailableMonths] = useState<string[]>([])
-  const [monthIdx, setMonthIdx] = useState(-1)
   const [sessions, setSessions] = useState<SessionStat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -429,17 +371,16 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
   const loadOverall = async () => {
     setLoading(true)
     try {
-      const data = await fetchStats()
+      const data = await fetchStats('all')
       setPlayers(data.players)
-      if (data.available_months.length > 0) setAvailableMonths(data.available_months)
     } catch { setError(true) }
     finally { setLoading(false) }
   }
 
-  const loadMonth = async (month: string) => {
+  const loadRecent = async () => {
     setLoading(true)
     try {
-      const data = await fetchStats(month)
+      const data = await fetchStats('recent')
       setPlayers(data.players)
     } catch { setError(true) }
     finally { setLoading(false) }
@@ -456,13 +397,9 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
 
   useEffect(() => {
     setLoading(true)
-    fetchStats()
+    fetchStats('recent')
       .then((data) => {
         setPlayers(data.players)
-        if (data.available_months.length > 0) {
-          setAvailableMonths(data.available_months)
-          setMonthIdx(data.available_months.length - 1)
-        }
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false))
@@ -473,24 +410,14 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
     setView(next)
     setShowInfo(false)
     if (next === 'overall') loadOverall()
+    else if (next === 'recent') loadRecent()
     else if (next === 'sessions') loadSessions()
-    else {
-      const month = availableMonths[monthIdx]
-      if (month) loadMonth(month)
-    }
-  }
-
-  const goMonth = (delta: number) => {
-    const next = monthIdx + delta
-    if (next < 0 || next >= availableMonths.length) return
-    setMonthIdx(next)
-    loadMonth(availableMonths[next])
   }
 
   const refresh = () => {
     if (view === 'overall') loadOverall()
+    else if (view === 'recent') loadRecent()
     else if (view === 'sessions') loadSessions()
-    else loadMonth(availableMonths[monthIdx])
   }
 
   const handleSave = async (id: string, s1: number, s2: number) => {
@@ -507,8 +434,6 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
     setEditingGame({ ...g, session_id: sessionId, team1Players: [], team2Players: [] })
   }
 
-  const currentMonth = monthIdx >= 0 ? availableMonths[monthIdx] : null
-
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -521,8 +446,8 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
   return (
     <div className="flex flex-col gap-4">
       {/* View toggle */}
-      <div className="flex gap-1 bg-slate-200 rounded-xl p-1">
-        {(['overall', 'sessions', 'monthly'] as LeaderboardView[]).map((v) => (
+      <div className="flex gap-1 rounded-xl bg-[#edf0f3] p-1">
+        {(['recent', 'sessions', 'overall'] as LeaderboardView[]).map((v) => (
           <button
             key={v}
             onClick={() => switchView(v)}
@@ -531,7 +456,7 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
               view === v ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             )}
           >
-            {v === 'overall' ? 'Overall' : v === 'sessions' ? 'Per Session' : 'Monthly'}
+            {v === 'recent' ? 'Latest' : v === 'sessions' ? 'Per Session' : 'Overall'}
           </button>
         ))}
       </div>
@@ -547,64 +472,28 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
         )
       )}
 
-      {/* Overall / Monthly leaderboard */}
+      {/* Overall / Last 50 leaderboard */}
       {view !== 'sessions' && (
         <Card className="overflow-hidden">
           <div className="px-3 py-2.5 border-b border-slate-100 flex items-center gap-1">
             <BarChart2 className="h-4 w-4 text-emerald-600 shrink-0" />
-            {view === 'overall' ? (
-              <>
-                <span className="text-sm font-semibold text-slate-700 flex-1">Last 50 games</span>
-                <button
-                  onClick={() => setShowInfo((v) => !v)}
-                  className={cn(
-                    'h-5 w-5 rounded-full text-[11px] font-bold border transition-colors shrink-0',
-                    showInfo
-                      ? 'bg-emerald-600 border-emerald-600 text-white'
-                      : 'border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-600'
-                  )}
-                >
-                  ?
-                </button>
-                <span className="text-xs text-slate-400 ml-1">
-                  {players.filter((p) => (p.recent_count ?? 0) >= OVERALL_MIN).length} players
-                </span>
-              </>
-            ) : (
-              <>
-                <button
-                  className="p-0.5 rounded hover:bg-slate-100 disabled:opacity-30 transition-colors"
-                  onClick={() => goMonth(-1)}
-                  disabled={monthIdx <= 0 || loading}
-                >
-                  <ChevronLeft className="h-4 w-4 text-slate-500" />
-                </button>
-                <span className="text-sm font-semibold text-slate-700 flex-1 text-center">
-                  {currentMonth ? formatMonth(currentMonth) : '—'}
-                </span>
-                <button
-                  className="p-0.5 rounded hover:bg-slate-100 disabled:opacity-30 transition-colors"
-                  onClick={() => goMonth(1)}
-                  disabled={monthIdx >= availableMonths.length - 1 || loading}
-                >
-                  <ChevronRight className="h-4 w-4 text-slate-500" />
-                </button>
-                <button
-                  onClick={() => setShowInfo((v) => !v)}
-                  className={cn(
-                    'h-5 w-5 rounded-full text-[11px] font-bold border transition-colors shrink-0 ml-1',
-                    showInfo
-                      ? 'bg-emerald-600 border-emerald-600 text-white'
-                      : 'border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-600'
-                  )}
-                >
-                  ?
-                </button>
-                <span className="text-xs text-slate-400 w-10 text-right">
-                  {players.filter((p) => p.games_played >= MIN_GAMES).length} players
-                </span>
-              </>
-            )}
+            <span className="text-sm font-semibold text-slate-700 flex-1">
+              {view === 'overall' ? 'Overall' : 'Latest'}
+            </span>
+            <button
+              onClick={() => setShowInfo((v) => !v)}
+              className={cn(
+                'h-5 w-5 rounded-full text-[11px] font-bold border transition-colors shrink-0',
+                showInfo
+                  ? 'bg-emerald-600 border-emerald-600 text-white'
+                  : 'border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-600'
+              )}
+            >
+              ?
+            </button>
+            <span className="text-xs text-slate-400 ml-1">
+              {players.length} players
+            </span>
           </div>
           {showInfo && (
             <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-100 flex flex-col gap-1.5 text-xs text-emerald-800">
@@ -612,15 +501,15 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
                 <>
                   <p className="font-semibold">How the Overall ranking works</p>
                   <p>· Ranked by <strong>PPG</strong> (points per game): Win = 3 pts, Draw = 1 pt, Loss = 0 pts</p>
-                  <p>· Score calculated from your <strong>last 50 games</strong> only</p>
-                  <p>· You must have played <strong>50+ games in the last 5 months</strong> to appear — stop showing up and you drop off</p>
+                  <p>· Score calculated from <strong>all recorded games</strong></p>
+                  <p>· Every player is shown; players with fewer games are still ranked from their available results</p>
                 </>
               ) : (
                 <>
-                  <p className="font-semibold">How the Monthly ranking works</p>
+                  <p className="font-semibold">How the Latest ranking works</p>
                   <p>· Ranked by <strong>PPG</strong> (points per game): Win = 3 pts, Draw = 1 pt, Loss = 0 pts</p>
-                  <p>· Score based on all games played in the selected month</p>
-                  <p>· Must have played <strong>10+ games that month</strong> to appear</p>
+                  <p>· Score calculated from each player's <strong>last 50 games</strong> when available</p>
+                  <p>· Every player is shown; players with fewer games are still ranked from their available results</p>
                 </>
               )}
             </div>
@@ -630,7 +519,7 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
               <div className="h-8 w-8 rounded-full border-4 border-emerald-200 border-t-emerald-600 animate-spin" />
             </div>
           ) : (
-            <PlayerLeaderboard players={players} view={view} />
+            <PlayerLeaderboard players={players} />
           )}
         </Card>
       )}

@@ -1,4 +1,4 @@
-import type { Player, Session, Game, StatsResponse, SessionStatsResponse } from './types'
+import type { Player, Session, Game, StatsResponse, SessionStatsResponse, TeamAssignment } from './types'
 import { authHeaders } from './auth'
 
 async function handle<T>(res: Response): Promise<T> {
@@ -63,6 +63,14 @@ export async function createSession(teams: Session['teams']): Promise<Session> {
   }))
 }
 
+export async function updateSessionTeams(id: string, teams: TeamAssignment[]): Promise<Pick<Session, 'id' | 'teams'>> {
+  return handle<Pick<Session, 'id' | 'teams'>>(await fetch(`/api/sessions/${id}`, {
+    method: 'PATCH',
+    headers: { ...JSON_HEADERS, ...authHeaders() },
+    body: JSON.stringify({ teams }),
+  }))
+}
+
 export async function deleteSession(id: string): Promise<void> {
   return handle<void>(await fetch(`/api/sessions/${id}`, {
     method: 'DELETE',
@@ -74,8 +82,8 @@ export async function fetchSessionStats(): Promise<SessionStatsResponse> {
   return handle<SessionStatsResponse>(await fetch('/api/session-stats'))
 }
 
-export async function fetchStats(month?: string): Promise<StatsResponse> {
-  const url = month ? `/api/stats?month=${month}` : '/api/stats'
+export async function fetchStats(scope: 'all' | 'recent' = 'recent'): Promise<StatsResponse> {
+  const url = scope === 'all' ? '/api/stats?scope=all' : '/api/stats'
   return handle<StatsResponse>(await fetch(url))
 }
 
