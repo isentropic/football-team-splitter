@@ -26,8 +26,6 @@ function accumulateGame(
   }
 }
 
-const RECENCY_MIN = 50
-
 function sortByPPG(rows: StatRow[]): StatRow[] {
   return [...rows].sort((a, b) => {
     const ppgA = a.games_played > 0 ? a.pts / a.games_played : 0
@@ -44,7 +42,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   const [{ results: sessions }, { results: allGames }, { results: players }] = await Promise.all([
     ctx.env.DB.prepare('SELECT id, teams FROM sessions').all(),
     ctx.env.DB.prepare('SELECT * FROM games ORDER BY played_at DESC, rowid DESC').all(),
-    ctx.env.DB.prepare('SELECT id, name FROM players ORDER BY name ASC').all(),
+    ctx.env.DB.prepare('SELECT id, name, retired FROM players ORDER BY name ASC').all(),
   ])
 
   // Build color→playerIds map per session
@@ -68,7 +66,10 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   // Base statsMap (all players start at zero)
   const baseMap = (): Record<string, StatRow> => {
     const m: Record<string, StatRow> = {}
-    for (const p of players) m[p.id as string] = makeStatRow(p.id as string, p.name as string)
+    for (const p of players) {
+      if (p.retired) continue
+      m[p.id as string] = makeStatRow(p.id as string, p.name as string)
+    }
     return m
   }
 
@@ -94,7 +95,6 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     // Score: last 50 games per player, newest-first.
     // rowid DESC in the SQL query ensures that within a session (same played_at),
     // later games in the session are prioritized over earlier ones.
-    // Eligible: ≥ 50 recent games within the last 150 days.
     games = allGames
     statsMap = baseMap()
 
@@ -131,37 +131,14 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
       accumulate(t2, s2 > s1)
     }
 
-    // Attach recent_count; remove players with zero recent activity
+    // Attach recent_count for context, but keep every player in the ranking.
     for (const id of Object.keys(statsMap)) {
-      const rc = playerRecentCount[id] ?? 0
-      if (rc === 0) {
-        delete statsMap[id]
-      } else {
-        statsMap[id].recent_count = rc
-      }
+      statsMap[id].recent_count = playerRecentCount[id] ?? 0
     }
   }
 
   let playerStats: StatRow[]
-  if (month) {
-    playerStats = sortByPPG(Object.values(statsMap))
-  } else {
-    const eligible = Object.values(statsMap).filter((p) => (p.recent_count ?? 0) >= RECENCY_MIN)
-    const pending  = Object.values(statsMap).filter((p) => (p.recent_count ?? 0) < RECENCY_MIN)
-    eligible.sort((a, b) => {
-      const ppgA = a.games_played > 0 ? a.pts / a.games_played : 0
-      const ppgB = b.games_played > 0 ? b.pts / b.games_played : 0
-      if (ppgB !== ppgA) return ppgB - ppgA
-      if (b.pts !== a.pts) return b.pts - a.pts
-      return b.games_played - a.games_played
-    })
-    pending.sort((a, b) => (b.recent_count ?? 0) - (a.recent_count ?? 0))
-    // Redact stats for pending players — only recent_count is real
-    const redacted = pending.map(({ id, name, recent_count }) =>
-      ({ id, name, games_played: 0, wins: 0, draws: 0, losses: 0, pts: 0, recent_count })
-    )
-    playerStats = [...eligible, ...redacted]
-  }
+  playerStats = sortByPPG(Object.values(statsMap))
 
   const recentGames = games.slice(0, 30).map((g) => {
     const colorMap = sessionTeamMap[g.session_id as string] ?? {}

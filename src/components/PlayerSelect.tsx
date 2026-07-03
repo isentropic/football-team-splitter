@@ -101,7 +101,7 @@ export function PlayerSelect({ players, selected, onChange, max }: Props) {
         <div className="flex flex-wrap gap-1.5">
           {selectedPlayers.map((p) => (
             <span key={p.id} className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-medium px-2.5 py-1">
-              {p.name.split(' ')[0]}
+              {p.name}
               <button onClick={() => toggle(p.id)} className="ml-0.5 hover:text-emerald-600">
                 <X className="h-3 w-3" />
               </button>

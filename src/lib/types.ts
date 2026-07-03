@@ -8,6 +8,7 @@ export interface Player {
   defending: number
   physique: number
   morale: number
+  retired: boolean
 }
 
 export interface Team {
@@ -28,15 +29,19 @@ export interface SplitVariant {
   id: number
   teams: Team[]
   balanceScore: number
+  recentTeammatePairs?: Record<string, number>
 }
 
 export interface SplitResponse {
   variants: SplitVariant[]
 }
 
+export type TeamAssignment = { color: string; playerIds: string[] }
+export type LockedTeams = Record<string, string>
+
 export interface Session {
   id: string
-  teams: { color: string; playerIds: string[] }[]
+  teams: TeamAssignment[]
   played_at: number
 }
 

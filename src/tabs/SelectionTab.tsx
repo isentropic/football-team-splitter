@@ -14,15 +14,22 @@ interface Props {
 
 const MIN = 6  // minimum 2 players per team
 
-export function SelectionTab({ players, selected, onSelectionChange, onGenerate, isLoading }: Props) {
+export function SelectionTab({
+  players,
+  selected,
+  onSelectionChange,
+  onGenerate,
+  isLoading,
+}: Props) {
   const canGenerate = selected.length >= MIN
   const selectedPlayers = players.filter((p) => selected.includes(p.id))
+  const teamCount = selected.length >= 20 ? 4 : 3
   const avgOverall = selectedPlayers.length
     ? (selectedPlayers.reduce((s, p) => s + overall(p), 0) / selectedPlayers.length).toFixed(1)
     : '—'
 
   const teamSize = selected.length > 0
-    ? `${Math.floor(selected.length / 3)}${selected.length % 3 !== 0 ? `–${Math.floor(selected.length / 3) + 1}` : ''}`
+    ? `${Math.floor(selected.length / teamCount)}${selected.length % teamCount !== 0 ? `–${Math.floor(selected.length / teamCount) + 1}` : ''}`
     : '—'
 
   return (
@@ -65,7 +72,7 @@ export function SelectionTab({ players, selected, onSelectionChange, onGenerate,
           onClick={onGenerate}
         >
           <Zap className="h-5 w-5" />
-          {isLoading ? 'Generating…' : `Generate Teams (${selected.length} players)`}
+          {isLoading ? 'Loading…' : `Next: Fix players (${selected.length})`}
         </Button>
       </div>
     </div>

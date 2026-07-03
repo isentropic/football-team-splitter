@@ -11,16 +11,19 @@ const TEAM_TEXT: Record<string, string> = {
   orange: 'text-orange-600',
   blue:   'text-blue-600',
   green:  'text-emerald-600',
+  white:  'text-slate-700',
 }
 const TEAM_BG: Record<string, string> = {
   orange: 'bg-orange-500',
   blue:   'bg-blue-500',
   green:  'bg-emerald-500',
+  white:  'bg-white border border-slate-300',
 }
 const TEAM_LIGHT: Record<string, string> = {
   orange: 'bg-orange-50',
   blue:   'bg-blue-50',
   green:  'bg-emerald-50',
+  white:  'bg-white',
 }
 const teamText  = (c: string) => TEAM_TEXT[c]  ?? 'text-slate-700'
 const teamBg    = (c: string) => TEAM_BG[c]    ?? 'bg-slate-400'
@@ -58,28 +61,20 @@ function MedalIcon({ rank }: { rank: number }) {
 }
 
 const MIN_GAMES = 10
-const OVERALL_MIN = 50
-
-const FAKE_CHARS = 'ABCDEFGHJKLMNPQRSTVWXZ'
-function fakeStr(id: string, offset: number) {
-  let h = offset
-  for (let i = 0; i < id.length; i++) h = (Math.imul(h + 7, 31) + id.charCodeAt(i)) >>> 0
-  return FAKE_CHARS[h % FAKE_CHARS.length] + FAKE_CHARS[(h >>> 5) % FAKE_CHARS.length]
-}
 
 function PlayerLeaderboard({ players, view }: { players: PlayerStat[]; view: 'overall' | 'monthly' }) {
   const isOverall = view === 'overall'
 
   const ranked = isOverall
-    ? players.filter((p) => (p.recent_count ?? 0) >= OVERALL_MIN)
+    ? players
     : players.filter((p) => p.games_played >= MIN_GAMES)
 
   const pending = isOverall
-    ? players.filter((p) => { const rc = p.recent_count ?? 0; return rc > 0 && rc < OVERALL_MIN })
+    ? []
     : players.filter((p) => p.games_played > 0 && p.games_played < MIN_GAMES)
 
   if (ranked.length === 0 && pending.length === 0) {
-    return <p className="text-sm text-slate-400 text-center py-6">No players qualify yet.</p>
+    return <p className="text-sm text-slate-400 text-center py-6">No players yet.</p>
   }
 
   return (
@@ -117,37 +112,6 @@ function PlayerLeaderboard({ players, view }: { players: PlayerStat[]; view: 'ov
           </div>
         )
       })}
-      {isOverall && pending.length > 0 && (
-        <>
-          <div className="flex items-center gap-2 px-3 py-1.5 border-t border-dashed border-slate-200 bg-slate-50/60">
-            <div className="h-px flex-1 bg-slate-200" />
-            <span className="text-[10px] font-semibold text-slate-400 tracking-wide shrink-0">ALMOST THERE</span>
-            <div className="h-px flex-1 bg-slate-200" />
-          </div>
-          {pending.map((p) => {
-            const need = OVERALL_MIN - (p.recent_count ?? 0)
-            return (
-              <div
-                key={p.id}
-                className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-x-2 items-center px-3 py-2.5 border-b border-slate-50 last:border-0"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-slate-300 w-4 text-center text-base leading-none">·</span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-500 truncate">{p.name}</p>
-                    <span className="text-[10px] font-medium text-amber-600">Need {need} more</span>
-                  </div>
-                </div>
-                <span className="w-7 text-center text-xs text-slate-500 blur-sm select-none">{fakeStr(p.id, 1)}</span>
-                <span className="w-5 text-center text-xs font-semibold text-emerald-600 blur-sm select-none">{fakeStr(p.id, 2)}</span>
-                <span className="w-5 text-center text-xs font-semibold text-amber-500 blur-sm select-none">{fakeStr(p.id, 3)}</span>
-                <span className="w-5 text-center text-xs font-semibold text-red-400 blur-sm select-none">{fakeStr(p.id, 4)}</span>
-                <span className="w-10 text-center text-xs font-bold text-slate-700 blur-sm select-none">{fakeStr(p.id, 5)}</span>
-              </div>
-            )
-          })}
-        </>
-      )}
       {!isOverall && pending.length > 0 && (
         <p className="text-xs text-slate-400 px-3 pt-2 pb-1">{pending.length} players need {MIN_GAMES}+ games to appear</p>
       )}
@@ -265,7 +229,7 @@ function SessionCard({
 
             {/* Player names */}
             <p className="text-[11px] text-slate-500 mb-2.5 leading-relaxed">
-              {t.playerNames.map((n) => n.split(' ')[0]).join(', ')}
+              {t.playerNames.join(', ')}
             </p>
 
             {/* Raw stats row */}
@@ -567,7 +531,7 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
                   ?
                 </button>
                 <span className="text-xs text-slate-400 ml-1">
-                  {players.filter((p) => (p.recent_count ?? 0) >= OVERALL_MIN).length} players
+                  {players.length} players
                 </span>
               </>
             ) : (
@@ -612,8 +576,8 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
                 <>
                   <p className="font-semibold">How the Overall ranking works</p>
                   <p>· Ranked by <strong>PPG</strong> (points per game): Win = 3 pts, Draw = 1 pt, Loss = 0 pts</p>
-                  <p>· Score calculated from your <strong>last 50 games</strong> only</p>
-                  <p>· You must have played <strong>50+ games in the last 5 months</strong> to appear — stop showing up and you drop off</p>
+                  <p>· Score calculated from each player's <strong>last 50 games</strong> when available</p>
+                  <p>· Every player is shown; players with fewer games are still ranked from their available results</p>
                 </>
               ) : (
                 <>

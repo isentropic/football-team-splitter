@@ -25,10 +25,11 @@ const schema = z.object({
   defending:  stat,
   physique:   stat,
   morale:     stat,
+  retired:    z.boolean(),
 })
 type FormData = z.infer<typeof schema>
 
-const STATS: { key: keyof Omit<FormData, 'name'>; label: string }[] = [
+const STATS: { key: keyof Omit<FormData, 'name' | 'retired'>; label: string }[] = [
   { key: 'pace',      label: 'Pace' },
   { key: 'shooting',  label: 'Shooting' },
   { key: 'passing',   label: 'Passing' },
@@ -44,7 +45,7 @@ const avatarColors = [
 ]
 const colorFor = (name: string) => avatarColors[name.charCodeAt(0) % avatarColors.length]
 
-const DEFAULT_STATS: Omit<FormData, 'name'> = { pace:7, shooting:7, passing:7, dribbling:7, defending:7, physique:7, morale:7 }
+const DEFAULT_STATS: Omit<FormData, 'name'> = { pace:7, shooting:7, passing:7, dribbling:7, defending:7, physique:7, morale:7, retired: false }
 
 function PlayerForm({ defaultValues, onSubmit, onClose }: {
   defaultValues?: FormData
@@ -89,6 +90,15 @@ function PlayerForm({ defaultValues, onSubmit, onClose }: {
         ))}
       </div>
 
+      <label className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+        <span className="text-sm font-medium text-slate-700">Retired player</span>
+        <input
+          type="checkbox"
+          className="h-4 w-4 rounded border-slate-300 accent-emerald-600"
+          {...register('retired')}
+        />
+      </label>
+
       <div className="flex gap-2 pt-1">
         <Button type="button" variant="outline" className="flex-1" onClick={onClose} disabled={submitting}>Cancel</Button>
         <Button type="submit" className="flex-1" disabled={submitting}>
@@ -115,7 +125,11 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [showRetired, setShowRetired] = useState(false)
   const csvRef = useRef<HTMLInputElement>(null)
+  const activePlayers = players.filter((player) => !player.retired)
+  const retiredPlayers = players.filter((player) => player.retired)
+  const visiblePlayers = showRetired ? retiredPlayers : activePlayers
 
   const colDef = (key: keyof Player, label: string): ColumnDef<Player> => ({
     accessorKey: key,
@@ -137,6 +151,11 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
             {initials(row.original.name)}
           </div>
           <span className="text-xs font-medium text-slate-900 truncate max-w-[80px]">{row.original.name}</span>
+          {row.original.retired && (
+            <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+              Retired
+            </span>
+          )}
         </div>
       ),
     },
@@ -168,7 +187,7 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
   ]
 
   const table = useReactTable({
-    data: players, columns,
+    data: visiblePlayers, columns,
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
@@ -208,6 +227,7 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
           defending: clamp(Number(c[idx('defending')])),
           physique:  clamp(Number(c[idx('physique')])),
           morale:    clamp(Number(c[idx('morale')])),
+          retired:   false,
         }
         // skip rows with no real data
         if (Object.values(row).slice(1).some((v) => isNaN(v as number))) continue
@@ -247,6 +267,27 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
         </Dialog>
       </div>
 
+      <div className="flex rounded-xl bg-slate-200 p-1">
+        <button
+          className={cn(
+            'flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors',
+            !showRetired ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          )}
+          onClick={() => setShowRetired(false)}
+        >
+          Active ({activePlayers.length})
+        </button>
+        <button
+          className={cn(
+            'flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors',
+            showRetired ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          )}
+          onClick={() => setShowRetired(true)}
+        >
+          Retired ({retiredPlayers.length})
+        </button>
+      </div>
+
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -263,7 +304,7 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
             </thead>
             <tbody>
               {table.getRowModel().rows.length === 0 && (
-                <tr><td colSpan={columns.length} className="text-center text-slate-400 py-10 text-sm">No players yet.</td></tr>
+                <tr><td colSpan={columns.length} className="text-center text-slate-400 py-10 text-sm">No {showRetired ? 'retired' : 'active'} players.</td></tr>
               )}
               {table.getRowModel().rows.map((row) => (
                 <tr
@@ -279,7 +320,9 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-2 border-t border-slate-100 text-xs text-slate-400">{players.length} players</div>
+        <div className="px-4 py-2 border-t border-slate-100 text-xs text-slate-400">
+          {visiblePlayers.length} {showRetired ? 'retired' : 'active'} players
+        </div>
       </div>
 
       <Dialog open={!!editingPlayer} onOpenChange={(o) => !o && setEditingPlayer(null)}>
