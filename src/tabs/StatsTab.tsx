@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { BarChart2, Medal, Pencil, Layers } from 'lucide-react'
+import { BarChart2, Download, Medal, Pencil, Layers, Share2 } from 'lucide-react'
+import { toPng } from 'html-to-image'
 import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -178,20 +179,35 @@ function SessionCard({
   session,
   loggedIn,
   onEdit,
+  onShare,
 }: {
   session: SessionStat
   loggedIn: boolean
   onEdit: (g: SessionGameRow, sessionId: string) => void
+  onShare: (node: HTMLElement, label: string) => void
 }) {
+  const cardRef = useRef<HTMLDivElement>(null)
   const date = formatDayLabel(session.played_at)
   const gameCount = session.games.length
 
   return (
-    <Card className="overflow-hidden shrink-0">
+    <Card ref={cardRef} className="overflow-hidden shrink-0">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50/60">
         <span className="text-sm font-semibold text-slate-700">{date}</span>
-        <span className="text-xs text-slate-400">{gameCount} {gameCount === 1 ? 'game' : 'games'}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400">{gameCount} {gameCount === 1 ? 'game' : 'games'}</span>
+          <button
+            type="button"
+            data-share-control="true"
+            title="Share session image"
+            aria-label={`Share ${date} session image`}
+            className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-white hover:text-emerald-600"
+            onClick={() => cardRef.current && onShare(cardRef.current, date)}
+          >
+            <Share2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Teams */}
@@ -204,7 +220,6 @@ function SessionCard({
             <div className="flex items-center gap-2 mb-1.5">
               <div className={cn('h-2.5 w-2.5 rounded-full shrink-0', teamBg(t.color))} />
               <span className={cn('text-sm font-semibold', teamText(t.color))}>{capitalize(t.color)}</span>
-              <span className="text-xs text-slate-400 ml-0.5">{t.playerNames.length}p</span>
             </div>
 
             {/* Player names */}
@@ -231,20 +246,17 @@ function SessionCard({
               </span>
             </div>
 
-            {/* Per-game rates */}
+            {/* Points */}
             {t.games > 0 && (
-              <div className="grid grid-cols-4 mt-2 pt-2 border-t border-slate-100/80">
-                {[
-                  { label: 'P/G',  value: (pts / t.games).toFixed(2), color: 'text-slate-600' },
-                  { label: 'GD/G', value: (gd >= 0 ? '+' : '') + (gd / t.games).toFixed(1), color: gd >= 0 ? 'text-emerald-600' : 'text-red-400' },
-                  { label: 'GF/G', value: (t.gf / t.games).toFixed(1), color: 'text-slate-600' },
-                  { label: 'GA/G', value: (t.ga / t.games).toFixed(1), color: 'text-slate-600' },
-                ].map(({ label, value, color }) => (
-                  <div key={label} className="text-center">
-                    <div className="text-[9px] text-slate-400 font-medium">{label}</div>
-                    <div className={cn('text-[11px] font-semibold', color)}>{value}</div>
-                  </div>
-                ))}
+              <div className="mt-2 grid grid-cols-2 border-t border-slate-100/80 pt-2.5 text-center">
+                <div className="border-r border-slate-100">
+                  <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Total points</div>
+                  <div className={cn('mt-0.5 text-lg font-bold tabular-nums', teamText(t.color))}>{pts}</div>
+                </div>
+                <div>
+                  <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Points / game</div>
+                  <div className="mt-0.5 text-lg font-bold tabular-nums text-slate-700">{(pts / t.games).toFixed(2)}</div>
+                </div>
               </div>
             )}
           </div>
@@ -297,10 +309,12 @@ function SessionCarousel({
   sessions,
   loggedIn,
   onEdit,
+  onShare,
 }: {
   sessions: SessionStat[]
   loggedIn: boolean
   onEdit: (g: SessionGameRow, sessionId: string) => void
+  onShare: (node: HTMLElement, label: string) => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [current, setCurrent] = useState(0)
@@ -331,7 +345,7 @@ function SessionCarousel({
       >
         {sessions.map((s) => (
           <div key={s.id} className="snap-center shrink-0 w-[min(calc(100vw-3rem),29rem)]">
-            <SessionCard session={s} loggedIn={loggedIn} onEdit={onEdit} />
+            <SessionCard session={s} loggedIn={loggedIn} onEdit={onEdit} onShare={onShare} />
           </div>
         ))}
       </div>
@@ -367,6 +381,8 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
   const [error, setError] = useState(false)
   const [editingGame, setEditingGame] = useState<EnrichedGame | null>(null)
   const [showInfo, setShowInfo] = useState(false)
+  const [shareImage, setShareImage] = useState<{ url: string; label: string } | null>(null)
+  const [shareError, setShareError] = useState(false)
 
   const loadOverall = async () => {
     setLoading(true)
@@ -434,6 +450,21 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
     setEditingGame({ ...g, session_id: sessionId, team1Players: [], team2Players: [] })
   }
 
+  const createSessionImage = async (node: HTMLElement, label: string) => {
+    setShareError(false)
+    try {
+      const url = await toPng(node, {
+        backgroundColor: '#f8fafc',
+        cacheBust: true,
+        pixelRatio: 2,
+        filter: (element) => !(element instanceof HTMLElement && element.dataset.shareControl === 'true'),
+      })
+      setShareImage({ url, label })
+    } catch {
+      setShareError(true)
+    }
+  }
+
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -468,9 +499,34 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
             <div className="h-8 w-8 rounded-full border-4 border-emerald-200 border-t-emerald-600 animate-spin" />
           </div>
         ) : (
-          <SessionCarousel sessions={sessions} loggedIn={loggedIn} onEdit={openEditForSessionGame} />
+          <SessionCarousel sessions={sessions} loggedIn={loggedIn} onEdit={openEditForSessionGame} onShare={createSessionImage} />
         )
       )}
+
+      <Dialog open={shareImage !== null || shareError} onOpenChange={(open) => {
+        if (!open) {
+          setShareImage(null)
+          setShareError(false)
+        }
+      }}>
+        <DialogContent className="max-h-[90dvh] max-w-[min(100vw-2rem,34rem)] overflow-y-auto">
+          <div className="mb-3 flex items-center gap-2 pr-8">
+            <DialogHeader className="mb-0 space-y-0"><DialogTitle>Game results</DialogTitle></DialogHeader>
+            {shareImage && (
+              <a href={shareImage.url} download={`team-splitter-${shareImage.label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`}>
+                <Button size="sm" className="h-8 gap-1.5 px-3 py-0"><Download className="h-3.5 w-3.5" />Download</Button>
+              </a>
+            )}
+          </div>
+          {shareImage ? (
+            <div>
+              <img src={shareImage.url} alt={`${shareImage.label} session preview`} className="w-full" />
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">Could not create the session image.</p>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Overall / Last 50 leaderboard */}
       {view !== 'sessions' && (

@@ -6,7 +6,7 @@ import {
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Trash2, Upload, ArrowUpDown, Search, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Upload, ArrowUpDown, Search, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -314,17 +314,33 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
       </div>
 
       {editingPlayer && (
-        <Dialog open onOpenChange={(o) => !o && setEditingPlayer(null)}>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Edit player</DialogTitle></DialogHeader>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 p-4" onMouseDown={() => setEditingPlayer(null)}>
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-player-title"
+            className="relative z-[101] max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="mb-5 flex items-center justify-between">
+              <h2 id="edit-player-title" className="text-lg font-semibold text-slate-900">Edit player</h2>
+              <button
+                type="button"
+                aria-label="Close edit player"
+                className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                onClick={() => setEditingPlayer(null)}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
             <PlayerForm
               key={editingPlayer.id}
               defaultValues={playerToFormData(editingPlayer)}
               onSubmit={(data) => onUpdate(editingPlayer.id, { ...data, retired: editingPlayer.retired })}
               onClose={() => setEditingPlayer(null)}
             />
-          </DialogContent>
-        </Dialog>
+          </section>
+        </div>
       )}
 
       <Dialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
