@@ -23,6 +23,11 @@ export interface Team {
   avgPhysique: number
   avgMorale: number
   avgOverall: number
+  positionCounts?: {
+    attack: number
+    defense: number
+    both: number
+  }
 }
 
 export interface SplitVariant {
@@ -34,10 +39,11 @@ export interface SplitVariant {
 
 export interface SplitResponse {
   variants: SplitVariant[]
+  positionVariants: SplitVariant[]
 }
 
 export type TeamAssignment = { color: string; playerIds: string[] }
-export type LockedTeams = Record<string, string>
+export type SeparationGroups = string[][]
 
 export interface Session {
   id: string

@@ -8,7 +8,7 @@ import { LoginScreen } from '@/components/LoginScreen'
 import { cn } from '@/lib/utils'
 import { isLoggedIn, clearToken } from '@/lib/auth'
 import * as api from '@/lib/api'
-import type { Player, SplitVariant, Session, Game, LockedTeams } from '@/lib/types'
+import type { Player, SplitVariant, SplitResponse, Session, Game, SeparationGroups } from '@/lib/types'
 
 const ACTIVE_SESSION_KEY = 'fts-active-session'
 
@@ -26,8 +26,9 @@ export default function App() {
   const [players, setPlayers] = useState<Player[]>([])
   const [playersLoading, setPlayersLoading] = useState(true)
   const [selected, setSelected] = useState<string[]>([])
-  const [lockedTeams, setLockedTeams] = useState<LockedTeams>({})
+  const [separationGroups, setSeparationGroups] = useState<SeparationGroups>([])
   const [variants, setVariants] = useState<SplitVariant[]>([])
+  const [positionVariants, setPositionVariants] = useState<SplitVariant[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [activeTab, setActiveTab] = useState<Tab>('stats')
   const [activeSession, setActiveSession] = useState<(Session & { games: Game[] }) | null>(null)
@@ -69,11 +70,10 @@ export default function App() {
     setPlayers((prev) => prev.map((p) => (p.id === id ? updated : p)))
     if (updated.retired) {
       setSelected((prev) => prev.filter((selectedId) => selectedId !== id))
-      setLockedTeams((prev) => {
-        const next = { ...prev }
-        delete next[id]
-        return next
-      })
+      setSeparationGroups((prev) => prev
+        .map((group) => group.filter((playerId) => playerId !== id))
+        .filter((group) => group.length >= 2)
+      )
     }
   }
 
@@ -81,11 +81,10 @@ export default function App() {
     await api.deletePlayer(id)
     setPlayers((prev) => prev.filter((p) => p.id !== id))
     setSelected((prev) => prev.filter((s) => s !== id))
-    setLockedTeams((prev) => {
-      const next = { ...prev }
-      delete next[id]
-      return next
-    })
+    setSeparationGroups((prev) => prev
+      .map((group) => group.filter((playerId) => playerId !== id))
+      .filter((group) => group.length >= 2)
+    )
   }
 
   const handleImport = async (rows: Omit<Player, 'id'>[]) => {
@@ -95,25 +94,27 @@ export default function App() {
 
   const handleSelectionChange = (ids: string[]) => {
     setSelected(ids)
-    setLockedTeams((prev) => Object.fromEntries(
-      Object.entries(prev).filter(([playerId]) => ids.includes(playerId))
-    ))
+    setSeparationGroups((prev) => prev
+      .map((group) => group.filter((playerId) => ids.includes(playerId)))
+      .filter((group) => group.length >= 2)
+    )
   }
 
-  const handleGenerate = async (locksOverride?: LockedTeams) => {
+  const handleGenerate = async (groupsOverride?: SeparationGroups) => {
     const selectedPlayers = activePlayers.filter((p) => selected.includes(p.id))
-    const selectedLocks = Object.fromEntries(
-      Object.entries(locksOverride ?? lockedTeams).filter(([playerId]) => selected.includes(playerId))
-    )
+    const selectedGroups = (groupsOverride ?? separationGroups)
+      .map((group) => group.filter((playerId) => selected.includes(playerId)))
+      .filter((group) => group.length >= 2)
     setIsGenerating(true)
     try {
       const res = await fetch('/api/split', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ players: selectedPlayers, locks: selectedLocks }),
+        body: JSON.stringify({ players: selectedPlayers, separationGroups: selectedGroups }),
       })
-      const data = await res.json() as { variants: SplitVariant[] }
+      const data = await res.json() as SplitResponse
       setVariants(data.variants ?? [])
+      setPositionVariants(data.positionVariants ?? [])
     } catch (err) {
       console.error(err)
     } finally {
@@ -227,9 +228,10 @@ export default function App() {
                 players={activePlayers}
                 selected={selected}
                 onSelectionChange={handleSelectionChange}
-                lockedTeams={lockedTeams}
-                onLockedTeamsChange={setLockedTeams}
+                separationGroups={separationGroups}
+                onSeparationGroupsChange={setSeparationGroups}
                 variants={variants}
+                positionVariants={positionVariants}
                 isGenerating={isGenerating}
                 onGenerate={handleGenerate}
                 onLockTeams={handleLockTeams}

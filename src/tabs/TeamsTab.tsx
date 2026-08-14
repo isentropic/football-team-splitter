@@ -4,17 +4,18 @@ import { SelectionTab } from './SelectionTab'
 import { SplitTab } from './SplitTab'
 import { TeamAdjuster } from '@/components/TeamAdjuster'
 import { PlayerFixTab } from './PlayerFixTab'
-import type { LockedTeams, Player, SplitVariant } from '@/lib/types'
+import type { Player, SeparationGroups, SplitVariant } from '@/lib/types'
 
 interface Props {
   players: Player[]
   selected: string[]
   onSelectionChange: (ids: string[]) => void
-  lockedTeams: LockedTeams
-  onLockedTeamsChange: (locks: LockedTeams) => void
+  separationGroups: SeparationGroups
+  onSeparationGroupsChange: (groups: SeparationGroups) => void
   variants: SplitVariant[]
+  positionVariants: SplitVariant[]
   isGenerating: boolean
-  onGenerate: (locksOverride?: LockedTeams) => void
+  onGenerate: (groupsOverride?: SeparationGroups) => void
   onLockTeams: (v: SplitVariant) => void
   hasActiveSession?: boolean
 }
@@ -23,36 +24,29 @@ export function TeamsTab({
   players,
   selected,
   onSelectionChange,
-  lockedTeams,
-  onLockedTeamsChange,
+  separationGroups,
+  onSeparationGroupsChange,
   variants,
+  positionVariants,
   isGenerating,
   onGenerate,
   onLockTeams,
   hasActiveSession = false,
 }: Props) {
-  const [showSplit, setShowSplit] = useState(variants.length > 0)
+  const [showSplit, setShowSplit] = useState(variants.length + positionVariants.length > 0)
   const [setupVariant, setSetupVariant] = useState<SplitVariant | null>(null)
   const [showPlayerFix, setShowPlayerFix] = useState(false)
 
   useEffect(() => {
-    if (!isGenerating && variants.length > 0) {
+    if (!isGenerating && variants.length + positionVariants.length > 0) {
       setShowSplit(true)
       setShowPlayerFix(false)
     }
-  }, [isGenerating, variants.length])
+  }, [isGenerating, variants.length, positionVariants.length])
 
   useEffect(() => {
     if (isGenerating) setSetupVariant(null)
   }, [isGenerating])
-
-  useEffect(() => {
-    if (selected.length >= 20) return
-    if (!Object.values(lockedTeams).includes('white')) return
-    onLockedTeamsChange(Object.fromEntries(
-      Object.entries(lockedTeams).filter(([, color]) => color !== 'white')
-    ))
-  }, [lockedTeams, onLockedTeamsChange, selected.length])
 
   const sessionBanner = hasActiveSession ? (
     <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5">
@@ -87,13 +81,13 @@ export function TeamsTab({
           </button>
           <PlayerFixTab
             players={selectedPlayers}
-            teamCount={selected.length >= 20 ? 4 : 3}
-            lockedTeams={lockedTeams}
-            onLockedTeamsChange={onLockedTeamsChange}
+            teamCount={selected.length >= 20 ? 4 : selected.length >= 15 ? 3 : 2}
+            separationGroups={separationGroups}
+            onSeparationGroupsChange={onSeparationGroupsChange}
             onApply={() => onGenerate()}
             onSkip={() => {
-              onLockedTeamsChange({})
-              onGenerate({})
+              onSeparationGroupsChange([])
+              onGenerate([])
             }}
             isGenerating={isGenerating}
           />
@@ -150,9 +144,10 @@ export function TeamsTab({
       </button>
       <SplitTab
         variants={variants}
+        positionVariants={positionVariants}
         isLoading={false}
-        onRegenerate={() => onGenerate(lockedTeams)}
-        fixedCount={Object.keys(lockedTeams).length}
+        onRegenerate={() => onGenerate()}
+        separationGroupCount={separationGroups.length}
         hasSelection={selected.length >= 6}
         onUseTeams={setSetupVariant}
         hasActiveSession={hasActiveSession}

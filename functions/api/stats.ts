@@ -1,5 +1,7 @@
 import type { Env } from '../_lib/db'
 
+const SCORE_WINDOW = 50
+
 function monthKey(ts: number): string {
   const d = new Date(ts)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -114,7 +116,6 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     games = allGames
     statsMap = baseMap()
 
-    const SCORE_WINDOW = 50
     const fiveMonthsAgo = Date.now() - 150 * 24 * 60 * 60 * 1000
 
     const playerScoreCount: Record<string, number> = {}
@@ -153,8 +154,12 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     }
   }
 
-  let playerStats: StatRow[]
-  playerStats = sortByPPG(Object.values(statsMap))
+  // Latest and Overall rankings need enough games to make PPG meaningful.
+  // Keep the monthly endpoint unfiltered because it is a session-period view.
+  const requiresMinimumGames = scope === 'all' || !month
+  const playerStats = sortByPPG(Object.values(statsMap)).filter(
+    (player) => !requiresMinimumGames || player.games_played >= SCORE_WINDOW,
+  )
 
   const recentGames = games.slice(0, 30).map((g) => {
     const colorMap = sessionTeamMap[g.session_id as string] ?? {}

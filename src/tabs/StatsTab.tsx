@@ -587,16 +587,15 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
                   <p className="font-semibold">How the Overall ranking works</p>
                   <p>· Ranked by <strong>PPG</strong> (points per game): Win = 3 pts, Draw = 1 pt, Loss = 0 pts</p>
                   <p>· Score calculated from <strong>all recorded games</strong></p>
-                  <p>· Every player is shown; players with fewer games are still ranked from their available results</p>
                 </>
               ) : (
                 <>
                   <p className="font-semibold">How the Latest ranking works</p>
                   <p>· Ranked by <strong>PPG</strong> (points per game): Win = 3 pts, Draw = 1 pt, Loss = 0 pts</p>
                   <p>· Score calculated from each player's <strong>last 50 games</strong> when available</p>
-                  <p>· Every player is shown; players with fewer games are still ranked from their available results</p>
                 </>
               )}
+              <p>· Only players with at least <strong>50 games</strong> are eligible for this ranking</p>
             </div>
           )}
           {loading ? (

@@ -12,7 +12,7 @@ interface Props {
   isLoading: boolean
 }
 
-const MIN = 6  // minimum 2 players per team
+const MIN = 6
 
 export function SelectionTab({
   players,
@@ -23,7 +23,7 @@ export function SelectionTab({
 }: Props) {
   const canGenerate = selected.length >= MIN
   const selectedPlayers = players.filter((p) => selected.includes(p.id))
-  const teamCount = selected.length >= 20 ? 4 : 3
+  const teamCount = selected.length >= 20 ? 4 : selected.length >= 15 ? 3 : 2
   const avgOverall = selectedPlayers.length
     ? (selectedPlayers.reduce((s, p) => s + overall(p), 0) / selectedPlayers.length).toFixed(1)
     : '—'
@@ -54,7 +54,7 @@ export function SelectionTab({
       {selected.length > 0 && selected.length < MIN && (
         <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700 flex items-center gap-2">
           <Users className="h-4 w-4 shrink-0" />
-          Select at least {MIN} players (2 per team minimum)
+          Select at least {MIN} players
         </div>
       )}
 

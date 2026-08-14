@@ -7,9 +7,10 @@ import type { SplitVariant, Team } from '@/lib/types'
 
 interface Props {
   variants: SplitVariant[]
+  positionVariants: SplitVariant[]
   isLoading: boolean
   onRegenerate: () => void
-  fixedCount: number
+  separationGroupCount: number
   hasSelection: boolean
   onUseTeams: (variant: SplitVariant) => void
   hasActiveSession?: boolean
@@ -97,6 +98,11 @@ function VariantCard({ variant, index, defaultOpen, onUseTeams, hasActiveSession
                 <div className="flex items-center gap-2 mb-2">
                   <div className={cn('h-3 w-3 rounded-full', color.bg)} />
                   <span className={cn('text-sm font-semibold', color.text)}>{team.name}</span>
+                  {team.positionCounts && (
+                    <span className="text-[10px] font-medium text-slate-500">
+                      A {team.positionCounts.attack} · D {team.positionCounts.defense} · B {team.positionCounts.both}
+                    </span>
+                  )}
                   <span className="text-xs text-slate-400 ml-auto">{team.avgOverall.toFixed(1)} avg</span>
                 </div>
                 <div className="flex flex-wrap gap-1 mb-2">
@@ -126,7 +132,40 @@ function VariantCard({ variant, index, defaultOpen, onUseTeams, hasActiveSession
   )
 }
 
-export function SplitTab({ variants, isLoading, onRegenerate, fixedCount, hasSelection, onUseTeams, hasActiveSession }: Props) {
+function AlgorithmResults({
+  title,
+  subtitle,
+  variants,
+  onUseTeams,
+  hasActiveSession,
+}: {
+  title: string
+  subtitle: string
+  variants: SplitVariant[]
+  onUseTeams: (variant: SplitVariant) => void
+  hasActiveSession?: boolean
+}) {
+  return (
+    <section className="flex flex-col gap-2">
+      <div className="px-1">
+        <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
+        <p className="text-xs text-slate-500">{subtitle}</p>
+      </div>
+      {variants.map((variant, index) => (
+        <VariantCard
+          key={variant.id}
+          variant={variant}
+          index={index}
+          defaultOpen={index === 0}
+          onUseTeams={onUseTeams}
+          hasActiveSession={hasActiveSession}
+        />
+      ))}
+    </section>
+  )
+}
+
+export function SplitTab({ variants, positionVariants, isLoading, onRegenerate, separationGroupCount, hasSelection, onUseTeams, hasActiveSession }: Props) {
   if (!hasSelection) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
@@ -147,7 +186,7 @@ export function SplitTab({ variants, isLoading, onRegenerate, fixedCount, hasSel
     )
   }
 
-  if (variants.length === 0) {
+  if (variants.length + positionVariants.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <p className="text-slate-500 text-sm">No variants yet.</p>
@@ -160,19 +199,30 @@ export function SplitTab({ variants, isLoading, onRegenerate, fixedCount, hasSel
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-slate-500">Top {variants.length} balanced splits</p>
-          {fixedCount > 0 && (
-            <p className="text-xs text-emerald-600 font-medium">{fixedCount} fixed player{fixedCount === 1 ? '' : 's'} applied</p>
+          <p className="text-sm text-slate-500">Compare balanced split options</p>
+          {separationGroupCount > 0 && (
+            <p className="text-xs text-emerald-600 font-medium">{separationGroupCount} separation group{separationGroupCount === 1 ? '' : 's'} applied</p>
           )}
         </div>
         <Button variant="outline" size="sm" onClick={onRegenerate} className="gap-1.5">
           <RefreshCw className="h-3.5 w-3.5" />
-          {fixedCount > 0 ? 'Regenerate with fixes' : 'Regenerate'}
+          {separationGroupCount > 0 ? 'Regenerate with groups' : 'Regenerate'}
         </Button>
       </div>
-      {variants.map((v, i) => (
-        <VariantCard key={v.id} variant={v} index={i} defaultOpen={i === 0} onUseTeams={onUseTeams} hasActiveSession={hasActiveSession} />
-      ))}
+      <AlgorithmResults
+        title="Current algorithm"
+        subtitle={`Balances all 7 player attributes · ${variants.length} options`}
+        variants={variants}
+        onUseTeams={onUseTeams}
+        hasActiveSession={hasActiveSession}
+      />
+      <AlgorithmResults
+        title="Overall + positions"
+        subtitle={`Balances overall rating and team roles · ${positionVariants.length} options`}
+        variants={positionVariants}
+        onUseTeams={onUseTeams}
+        hasActiveSession={hasActiveSession}
+      />
     </div>
   )
 }
