@@ -465,6 +465,35 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
     }
   }
 
+  const saveSessionImage = async () => {
+    if (!shareImage) return
+
+    const filename = `team-splitter-${shareImage.label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`
+    const response = await fetch(shareImage.url)
+    const blob = await response.blob()
+    const file = new File([blob], filename, { type: 'image/png' })
+
+    // iOS Safari does not reliably download data URLs. Sharing the generated
+    // image as a file opens the native sheet, including Save Image / Files.
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Game results' })
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) setShareError(true)
+      }
+      return
+    }
+
+    const objectUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(objectUrl)
+  }
+
+  const canShareSessionImage = typeof navigator !== 'undefined' && 'canShare' in navigator
+
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -513,9 +542,9 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
           <div className="mb-3 flex items-center gap-2 pr-8">
             <DialogHeader className="mb-0 space-y-0"><DialogTitle>Game results</DialogTitle></DialogHeader>
             {shareImage && (
-              <a href={shareImage.url} download={`team-splitter-${shareImage.label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`}>
-                <Button size="sm" className="h-8 gap-1.5 px-3 py-0"><Download className="h-3.5 w-3.5" />Download</Button>
-              </a>
+              <Button size="sm" className="h-8 gap-1.5 px-3 py-0" onClick={saveSessionImage}>
+                <Download className="h-3.5 w-3.5" />{canShareSessionImage ? 'Share image' : 'Download'}
+              </Button>
             )}
           </div>
           {shareImage ? (
