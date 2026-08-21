@@ -186,7 +186,7 @@ export default function App() {
         <div className="relative flex items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/18 text-2xl shadow-sm backdrop-blur-md">⚽</span>
           <div className="flex-1">
-            <h1 className="text-lg font-bold leading-tight text-white drop-shadow-[0_1px_1px_rgba(5,46,22,0.35)]">Team Splitter</h1>
+            <h1 className="text-lg font-bold leading-tight text-white drop-shadow-[0_1px_1px_rgba(5,46,22,0.35)]">Seoul Nomads</h1>
             <p className="text-lime-50/80 text-xs">
               {loggedIn
                 ? (playersLoading ? 'Loading…' : `${activePlayers.length} active players`)

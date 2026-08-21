@@ -175,6 +175,108 @@ function EditGameDialog({ game, onSave, onDelete, onClose }: {
   )
 }
 
+const shareTeamStyle = (color: string) => {
+  if (color === 'orange') return { accent: '#f97316', tint: '#fff7ed', text: '#c2410c' }
+  if (color === 'blue') return { accent: '#3b82f6', tint: '#eff6ff', text: '#1d4ed8' }
+  if (color === 'green') return { accent: '#10b981', tint: '#ecfdf5', text: '#047857' }
+  return { accent: '#cbd5e1', tint: '#ffffff', text: '#334155' }
+}
+
+function SessionShareBoard({ session, boardRef }: {
+  session: SessionStat
+  boardRef: React.RefObject<HTMLDivElement | null>
+}) {
+  const date = formatDayLabel(session.played_at)
+  const maxPlayers = Math.max(...session.teams.map((team) => team.playerNames.length), 0)
+
+  return (
+    <div className="fixed left-[-12000px] top-0" aria-hidden="true">
+      <div ref={boardRef} className="w-[1000px] bg-white p-10 text-black">
+        <header className="flex items-end justify-between pb-5">
+          <div>
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-600">Seoul Nomads</p>
+            <h2 className="text-[28px] font-bold leading-none">Game results</h2>
+          </div>
+          <div className="text-right">
+            <p className="text-[17px] font-semibold">{date}</p>
+            <p className="mt-1 text-[11px] text-black">{session.games.length} {session.games.length === 1 ? 'game' : 'games'}</p>
+          </div>
+        </header>
+
+        <main className="mt-6 grid grid-cols-[330px_1fr] items-start gap-8">
+          <section>
+            <h3 className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-black">Scores</h3>
+            <div className="border border-slate-200">
+              {session.games.map((game, index) => {
+                const team1 = shareTeamStyle(game.team1)
+                const team2 = shareTeamStyle(game.team2)
+                return (
+                  <div key={game.id} className="grid h-8 grid-cols-[24px_1fr_58px_1fr] items-center border-b border-slate-200 text-[11px] last:border-b-0">
+                    <span className="pl-2 text-black">{index + 1}</span>
+                    <span className="text-right font-semibold" style={{ color: team1.text }}>{capitalize(game.team1)}</span>
+                    <span className="text-center text-[13px] font-bold tabular-nums text-black">{game.score1} - {game.score2}</span>
+                    <span className="font-semibold" style={{ color: team2.text }}>{capitalize(game.team2)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-black">Teams</h3>
+            <div
+              className="grid border border-slate-200"
+              style={{ gridTemplateColumns: `repeat(${session.teams.length}, minmax(0, 1fr))` }}
+            >
+              {session.teams.map((team) => {
+                const style = shareTeamStyle(team.color)
+                return (
+                  <div key={team.color} className="border-r border-slate-200 last:border-r-0">
+                    <div className="border-b border-slate-200 px-3 py-2 text-center text-[12px] font-bold" style={{ backgroundColor: style.tint, color: style.text }}>
+                      {capitalize(team.color)}
+                    </div>
+                    <div className="py-1.5">
+                      {Array.from({ length: maxPlayers }, (_, playerIndex) => (
+                        <div key={playerIndex} className="h-6 px-3 text-center text-[11px] leading-6 text-black">
+                          {team.playerNames[playerIndex] ?? ''}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <h3 className="mb-2 mt-7 text-[11px] font-bold uppercase tracking-[0.14em] text-black">Team statistics</h3>
+            <div className="border border-slate-200 text-[10px] text-black">
+              <div className="grid grid-cols-[1.25fr_repeat(9,1fr)] border-b border-slate-200 bg-slate-50 py-2 text-center font-bold text-black">
+                <span className="text-left pl-3">Team</span>
+                <span>PTS</span><span>PPG</span><span>GP</span><span>W</span><span>D</span><span>L</span><span>GF</span><span>GA</span><span>GD</span>
+              </div>
+              {session.teams.map((team) => {
+                const style = shareTeamStyle(team.color)
+                const points = team.wins * 3 + team.draws
+                const goalDifference = team.gf - team.ga
+                return (
+                  <div key={team.color} className="grid grid-cols-[1.25fr_repeat(9,1fr)] border-b border-slate-200 py-2.5 text-center last:border-b-0">
+                    <span className="text-left pl-3 font-bold" style={{ color: style.text }}>{capitalize(team.color)}</span>
+                    <span className="font-bold">{points}</span>
+                    <span className="font-bold">{team.games ? (points / team.games).toFixed(2) : '-'}</span>
+                    <span>{team.games}</span><span>{team.wins}</span><span>{team.draws}</span><span>{team.losses}</span><span>{team.gf}</span><span>{team.ga}</span>
+                    <span className="font-semibold" style={{ color: goalDifference > 0 ? '#059669' : goalDifference < 0 ? '#f87171' : '#64748b' }}>
+                      {goalDifference > 0 ? '+' : ''}{goalDifference}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        </main>
+        </div>
+    </div>
+  )
+}
+
 function SessionCard({
   session,
   loggedIn,
@@ -184,14 +286,13 @@ function SessionCard({
   session: SessionStat
   loggedIn: boolean
   onEdit: (g: SessionGameRow, sessionId: string) => void
-  onShare: (node: HTMLElement, label: string) => void
+  onShare: (session: SessionStat) => void
 }) {
-  const cardRef = useRef<HTMLDivElement>(null)
   const date = formatDayLabel(session.played_at)
   const gameCount = session.games.length
 
   return (
-    <Card ref={cardRef} className="overflow-hidden shrink-0">
+    <Card className="overflow-hidden shrink-0">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50/60">
         <span className="text-sm font-semibold text-slate-700">{date}</span>
@@ -203,7 +304,7 @@ function SessionCard({
             title="Share session image"
             aria-label={`Share ${date} session image`}
             className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-white hover:text-emerald-600"
-            onClick={() => cardRef.current && onShare(cardRef.current, date)}
+            onClick={() => onShare(session)}
           >
             <Share2 className="h-3.5 w-3.5" />
           </button>
@@ -314,7 +415,7 @@ function SessionCarousel({
   sessions: SessionStat[]
   loggedIn: boolean
   onEdit: (g: SessionGameRow, sessionId: string) => void
-  onShare: (node: HTMLElement, label: string) => void
+  onShare: (session: SessionStat) => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [current, setCurrent] = useState(0)
@@ -381,8 +482,10 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
   const [error, setError] = useState(false)
   const [editingGame, setEditingGame] = useState<EnrichedGame | null>(null)
   const [showInfo, setShowInfo] = useState(false)
+  const [shareSource, setShareSource] = useState<SessionStat | null>(null)
   const [shareImage, setShareImage] = useState<{ url: string; label: string } | null>(null)
   const [shareError, setShareError] = useState(false)
+  const shareBoardRef = useRef<HTMLDivElement>(null)
 
   const loadOverall = async () => {
     setLoading(true)
@@ -450,25 +553,40 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
     setEditingGame({ ...g, session_id: sessionId, team1Players: [], team2Players: [] })
   }
 
-  const createSessionImage = async (node: HTMLElement, label: string) => {
+  const createSessionImage = (session: SessionStat) => {
     setShareError(false)
-    try {
-      const url = await toPng(node, {
-        backgroundColor: '#f8fafc',
-        cacheBust: true,
-        pixelRatio: 2,
-        filter: (element) => !(element instanceof HTMLElement && element.dataset.shareControl === 'true'),
-      })
-      setShareImage({ url, label })
-    } catch {
-      setShareError(true)
-    }
+    setShareImage(null)
+    setShareSource(session)
   }
+
+  useEffect(() => {
+    if (!shareSource) return
+
+    let cancelled = false
+    const renderImage = async () => {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      if (!shareBoardRef.current) return
+
+      try {
+        const url = await toPng(shareBoardRef.current, {
+          backgroundColor: '#ffffff',
+          cacheBust: true,
+          pixelRatio: 2,
+        })
+        if (!cancelled) setShareImage({ url, label: formatDayLabel(shareSource.played_at) })
+      } catch {
+        if (!cancelled) setShareError(true)
+      }
+    }
+
+    void renderImage()
+    return () => { cancelled = true }
+  }, [shareSource])
 
   const saveSessionImage = async () => {
     if (!shareImage) return
 
-    const filename = `team-splitter-${shareImage.label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`
+    const filename = `seoul-nomads-${shareImage.label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`
     const response = await fetch(shareImage.url)
     const blob = await response.blob()
     const file = new File([blob], filename, { type: 'image/png' })
@@ -532,13 +650,16 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
         )
       )}
 
-      <Dialog open={shareImage !== null || shareError} onOpenChange={(open) => {
+      {shareSource && <SessionShareBoard session={shareSource} boardRef={shareBoardRef} />}
+
+      <Dialog open={shareSource !== null || shareError} onOpenChange={(open) => {
         if (!open) {
+          setShareSource(null)
           setShareImage(null)
           setShareError(false)
         }
       }}>
-        <DialogContent className="max-h-[90dvh] max-w-[min(100vw-2rem,34rem)] overflow-y-auto">
+        <DialogContent className="max-h-[90dvh] max-w-[min(100vw-2rem,64rem)] overflow-y-auto">
           <div className="mb-3 flex items-center gap-2 pr-8">
             <DialogHeader className="mb-0 space-y-0"><DialogTitle>Game results</DialogTitle></DialogHeader>
             {shareImage && (
@@ -549,10 +670,14 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
           </div>
           {shareImage ? (
             <div>
-              <img src={shareImage.url} alt={`${shareImage.label} session preview`} className="w-full" />
+              <img src={shareImage.url} alt={`${shareImage.label} session preview`} className="w-full rounded-lg border border-slate-200" />
             </div>
-          ) : (
+          ) : shareError ? (
             <p className="text-sm text-slate-500">Could not create the session image.</p>
+          ) : (
+            <div className="flex items-center justify-center py-16">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-200 border-t-emerald-600" />
+            </div>
           )}
         </DialogContent>
       </Dialog>

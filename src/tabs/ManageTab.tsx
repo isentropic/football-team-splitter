@@ -1,17 +1,15 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import {
   useReactTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel,
   flexRender, type ColumnDef, type SortingState,
 } from '@tanstack/react-table'
-import { useForm, Controller } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Trash2, Upload, ArrowUpDown, Search, Loader2, X } from 'lucide-react'
+import { Plus, Trash2, Upload, ArrowUpDown, Search, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn, overall, statColor, initials } from '@/lib/utils'
 import type { Player } from '@/lib/types'
 
@@ -28,6 +26,9 @@ const schema = z.object({
 })
 type FormData = z.infer<typeof schema>
 type PlayerPayload = Omit<Player, 'id'>
+type EditorState =
+  | { mode: 'add' }
+  | { mode: 'edit'; player: Player }
 
 const STATS: { key: keyof Omit<FormData, 'name'>; label: string }[] = [
   { key: 'pace',      label: 'Pace' },
@@ -76,23 +77,40 @@ function PlayerForm({ defaultValues, onSubmit, onClose }: {
   onClose: () => void
 }) {
   const [submitting, setSubmitting] = useState(false)
-  const { register, handleSubmit, control, watch, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: defaultValues ?? { name: '', ...DEFAULT_STATS },
-  })
+  const [values, setValues] = useState<FormData>(() => defaultValues ?? { name: '', ...DEFAULT_STATS })
+  const [nameError, setNameError] = useState('')
 
-  const submit = async (data: FormData) => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const parsed = schema.safeParse(values)
+    if (!parsed.success) {
+      const issue = parsed.error.issues.find(({ path }) => path[0] === 'name')
+      setNameError(issue?.message ?? 'Check player details')
+      return
+    }
+
+    setNameError('')
     setSubmitting(true)
-    try { await onSubmit(data); onClose() }
+    try { await onSubmit(parsed.data); onClose() }
     finally { setSubmitting(false) }
   }
 
+  const updateStat = (key: keyof Omit<FormData, 'name'>, value: number) => {
+    setValues((current) => ({ ...current, [key]: value }))
+  }
+
   return (
-    <form onSubmit={handleSubmit(submit)} className="flex flex-col gap-4">
+    <form onSubmit={submit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="name">Name</Label>
-        <Input id="name" placeholder="Player name" {...register('name')} />
-        {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+        <Input
+          id="name"
+          placeholder="Player name"
+          value={values.name}
+          onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))}
+          disabled={submitting}
+        />
+        {nameError && <p className="text-xs text-red-500">{nameError}</p>}
       </div>
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-4">
@@ -100,14 +118,16 @@ function PlayerForm({ defaultValues, onSubmit, onClose }: {
           <div key={key} className="flex flex-col gap-1.5">
             <div className="flex justify-between items-center">
               <Label className="text-xs">{label}</Label>
-              <span className={cn('text-xs font-bold', statColor(watch(key)))}>{watch(key)}</span>
+              <span className={cn('text-xs font-bold', statColor(values[key]))}>{values[key]}</span>
             </div>
-            <Controller
-              control={control}
-              name={key}
-              render={({ field }) => (
-                <Slider min={1} max={10} step={0.5} value={[field.value]} onValueChange={([v]) => field.onChange(v)} />
-              )}
+            <Slider
+              min={1}
+              max={10}
+              step={0.5}
+              value={[values[key]]}
+              aria-label={label}
+              onValueChange={([value]) => updateStat(key, value)}
+              disabled={submitting}
             />
           </div>
         ))}
@@ -134,66 +154,70 @@ interface Props {
 export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Props) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
-  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null)
-  const [addOpen, setAddOpen] = useState(false)
+  const [editor, setEditor] = useState<EditorState | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [importing, setImporting] = useState(false)
   const csvRef = useRef<HTMLInputElement>(null)
-  const visiblePlayers = players.filter((player) => !player.retired)
+  const visiblePlayers = useMemo(
+    () => players.filter((player) => !player.retired),
+    [players]
+  )
 
-  const colDef = (key: keyof Player, label: string): ColumnDef<Player> => ({
-    accessorKey: key,
-    header: ({ column }) => (
-      <button className="flex items-center gap-1 text-xs" onClick={() => column.toggleSorting()}>
-        {label} <ArrowUpDown className="h-3 w-3" />
-      </button>
-    ),
-    cell: ({ getValue }) => {
-      const value = Number(getValue())
-      return <span className={cn('text-xs font-semibold', statColor(value))}>{formatRating(value)}</span>
-    },
-  })
-
-  const columns: ColumnDef<Player>[] = [
-    {
-      accessorKey: 'name',
-      header: 'Player',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <div className={cn('h-7 w-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0', colorFor(row.original.name))}>
-            {initials(row.original.name)}
-          </div>
-          <span className="text-xs font-medium text-slate-900 truncate max-w-[80px]">{row.original.name}</span>
-        </div>
-      ),
-    },
-    colDef('pace',      'PAC'),
-    colDef('shooting',  'SHO'),
-    colDef('passing',   'PAS'),
-    colDef('dribbling', 'DRI'),
-    colDef('defending', 'DEF'),
-    colDef('physique',  'PHY'),
-    colDef('morale',    'MOR'),
-    {
-      id: 'overall',
-      header: 'OVR',
-      accessorFn: (p) => overall(p),
-      cell: ({ getValue }) => <span className="font-bold text-xs text-slate-700">{(getValue() as number).toFixed(1)}</span>,
-    },
-    {
-      id: 'actions',
-      header: '',
-      cell: ({ row }) => (
-        <button
-          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-          onClick={(e) => { e.stopPropagation(); setDeleteId(row.original.id) }}
-        >
-          <Trash2 className="h-3 w-3" />
+  const columns = useMemo<ColumnDef<Player>[]>(() => {
+    const colDef = (key: keyof Player, label: string): ColumnDef<Player> => ({
+      accessorKey: key,
+      header: ({ column }) => (
+        <button className="flex items-center gap-1 text-xs" onClick={() => column.toggleSorting()}>
+          {label} <ArrowUpDown className="h-3 w-3" />
         </button>
       ),
-    },
-  ]
+      cell: ({ getValue }) => {
+        const value = Number(getValue())
+        return <span className={cn('text-xs font-semibold', statColor(value))}>{formatRating(value)}</span>
+      },
+    })
+
+    return [
+      {
+        accessorKey: 'name',
+        header: 'Player',
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2">
+            <div className={cn('h-7 w-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0', colorFor(row.original.name))}>
+              {initials(row.original.name)}
+            </div>
+            <span className="text-xs font-medium text-slate-900 truncate max-w-[80px]">{row.original.name}</span>
+          </div>
+        ),
+      },
+      colDef('pace',      'PAC'),
+      colDef('shooting',  'SHO'),
+      colDef('passing',   'PAS'),
+      colDef('dribbling', 'DRI'),
+      colDef('defending', 'DEF'),
+      colDef('physique',  'PHY'),
+      colDef('morale',    'MOR'),
+      {
+        id: 'overall',
+        header: 'OVR',
+        accessorFn: (p) => overall(p),
+        cell: ({ getValue }) => <span className="font-bold text-xs text-slate-700">{(getValue() as number).toFixed(1)}</span>,
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <button
+            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+            onClick={(e) => { e.stopPropagation(); setDeleteId(row.original.id) }}
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        ),
+      },
+    ]
+  }, [])
 
   const table = useReactTable({
     data: visiblePlayers, columns,
@@ -261,19 +285,29 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
             onChange={(e) => setGlobalFilter(e.target.value)}
           />
         </div>
-        <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" onClick={() => csvRef.current?.click()} disabled={importing}>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-10 w-10 shrink-0"
+          aria-label="Import players"
+          title="Import players"
+          onClick={() => csvRef.current?.click()}
+          disabled={importing}
+        >
           {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
         </Button>
         <input ref={csvRef} type="file" accept=".csv" className="hidden" onChange={importCSV} />
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogTrigger asChild>
-            <Button size="icon" className="h-10 w-10 shrink-0"><Plus className="h-4 w-4" /></Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Add player</DialogTitle></DialogHeader>
-            <PlayerForm onSubmit={(data) => onAdd({ ...data, retired: false })} onClose={() => setAddOpen(false)} />
-          </DialogContent>
-        </Dialog>
+        <Button
+          type="button"
+          size="icon"
+          className="h-10 w-10 shrink-0"
+          aria-label="Add player"
+          title="Add player"
+          onClick={() => setEditor({ mode: 'add' })}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -298,7 +332,7 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
                 <tr
                   key={row.id}
                   className="border-b border-slate-50 last:border-0 hover:bg-emerald-50 active:bg-emerald-100 transition-colors cursor-pointer"
-                  onClick={() => setEditingPlayer(row.original)}
+                  onClick={() => setEditor({ mode: 'edit', player: row.original })}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-2 py-2">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
@@ -313,35 +347,34 @@ export function ManageTab({ players, onAdd, onUpdate, onDelete, onImport }: Prop
         </div>
       </div>
 
-      {editingPlayer && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 p-4" onMouseDown={() => setEditingPlayer(null)}>
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="edit-player-title"
-            className="relative z-[101] max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className="mb-5 flex items-center justify-between">
-              <h2 id="edit-player-title" className="text-lg font-semibold text-slate-900">Edit player</h2>
-              <button
-                type="button"
-                aria-label="Close edit player"
-                className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                onClick={() => setEditingPlayer(null)}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <PlayerForm
-              key={editingPlayer.id}
-              defaultValues={playerToFormData(editingPlayer)}
-              onSubmit={(data) => onUpdate(editingPlayer.id, { ...data, retired: editingPlayer.retired })}
-              onClose={() => setEditingPlayer(null)}
-            />
-          </section>
-        </div>
-      )}
+      <Dialog open={editor !== null} onOpenChange={(open) => !open && setEditor(null)}>
+        <DialogContent
+          className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
+          aria-describedby={undefined}
+        >
+          {editor && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{editor.mode === 'add' ? 'Add player' : 'Edit player'}</DialogTitle>
+              </DialogHeader>
+              {editor.mode === 'add' ? (
+                <PlayerForm
+                  key="add-player"
+                  onSubmit={(data) => onAdd({ ...data, retired: false })}
+                  onClose={() => setEditor(null)}
+                />
+              ) : (
+                <PlayerForm
+                  key={editor.player.id}
+                  defaultValues={playerToFormData(editor.player)}
+                  onSubmit={(data) => onUpdate(editor.player.id, { ...data, retired: editor.player.retired })}
+                  onClose={() => setEditor(null)}
+                />
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <DialogContent>

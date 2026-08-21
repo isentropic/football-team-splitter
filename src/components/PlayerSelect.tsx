@@ -83,11 +83,11 @@ export function PlayerSelect({ players, selected, onChange, max }: Props) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-900 truncate">{player.name}</p>
                 <p className="text-xs text-slate-400">
-                  PAC {player.pace} · SHO {player.shooting} · PAS {player.passing} · DRI {player.dribbling} · DEF {player.defending} · PHY {player.physique} · MOR {player.morale}
+                  PAC {player.pace.toFixed(1)} · SHO {player.shooting.toFixed(1)} · PAS {player.passing.toFixed(1)} · DRI {player.dribbling.toFixed(1)} · DEF {player.defending.toFixed(1)} · PHY {player.physique.toFixed(1)} · MOR {player.morale.toFixed(1)}
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className="text-sm font-semibold text-slate-600">{overall(player)}</span>
+                <span className="text-sm font-semibold text-slate-600">{overall(player).toFixed(1)}</span>
                 <div className={cn('h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all', isSelected ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300')}>
                   {isSelected && <Check className="h-3 w-3 text-white" />}
                 </div>

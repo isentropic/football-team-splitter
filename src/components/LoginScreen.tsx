@@ -34,7 +34,7 @@ export function LoginScreen({ onLogin }: Props) {
           <div className="h-16 w-16 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-lg">
             <span className="text-3xl">⚽</span>
           </div>
-          <h1 className="text-xl font-bold text-slate-900">Team Splitter</h1>
+          <h1 className="text-xl font-bold text-slate-900">Seoul Nomads</h1>
           <p className="text-sm text-slate-500">Admin access required</p>
         </div>
 

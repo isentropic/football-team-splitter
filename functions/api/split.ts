@@ -22,7 +22,8 @@ const PPG_HALF_RANGE = 0.5
 const RECENT_TEAMMATE_SESSION_COUNT = 3
 const RECENT_PAIR_PENALTY_WEIGHT = 0.35
 const VARIANT_COUNT = 5
-const SEARCH_RUN_COUNT = 40
+const SEARCH_RUN_COUNT = 10
+const MIN_VARIANT_DIFFERENCE_RATIO = 0.3
 const POSITION_DISTRIBUTION_WEIGHT = 0.08
 
 const TEAM_DEFS = [
@@ -620,6 +621,51 @@ function partitionKey(players: Player[], assignment: number[], teamCount: number
   return groups.map((group) => group.sort().join(',')).sort().join('|')
 }
 
+// Count players whose team grouping changed after optimally matching team
+// labels. This treats color/order-only changes as identical while detecting
+// near-duplicate partitions that merely swap one pair of players.
+function partitionDifference(first: number[], second: number[], teamCount: number): number {
+  const overlaps = Array.from({ length: teamCount }, () => Array(teamCount).fill(0) as number[])
+  for (let playerIndex = 0; playerIndex < first.length; playerIndex++) {
+    overlaps[first[playerIndex]][second[playerIndex]]++
+  }
+
+  let mostUnchanged = 0
+  const usedSecondTeams = Array(teamCount).fill(false) as boolean[]
+  const matchTeams = (firstTeam: number, unchanged: number) => {
+    if (firstTeam === teamCount) {
+      mostUnchanged = Math.max(mostUnchanged, unchanged)
+      return
+    }
+    for (let secondTeam = 0; secondTeam < teamCount; secondTeam++) {
+      if (usedSecondTeams[secondTeam]) continue
+      usedSecondTeams[secondTeam] = true
+      matchTeams(firstTeam + 1, unchanged + overlaps[firstTeam][secondTeam])
+      usedSecondTeams[secondTeam] = false
+    }
+  }
+  matchTeams(0, 0)
+  return first.length - mostUnchanged
+}
+
+function selectDiverseRuns(candidates: SplitRun[], playerCount: number, teamCount: number): SplitRun[] {
+  const minimumDifference = Math.max(2, Math.ceil(playerCount * MIN_VARIANT_DIFFERENCE_RATIO))
+  const selected: SplitRun[] = []
+
+  // Candidates arrive best-score first. Preserve that quality ordering, but
+  // accept a candidate only when it differs enough from every chosen option.
+  for (const candidate of candidates) {
+    if (selected.every((existing) =>
+      partitionDifference(existing.assignment, candidate.assignment, teamCount) >= minimumDifference
+    )) {
+      selected.push(candidate)
+      if (selected.length === VARIANT_COUNT) break
+    }
+  }
+
+  return selected
+}
+
 type SplitRun = { assignment: number[]; score: number }
 
 function uniqueSplitRuns(
@@ -636,10 +682,10 @@ function uniqueSplitRuns(
     const existing = uniqueRuns.get(key)
     if (!existing || run.score < existing.score) uniqueRuns.set(key, run)
   }
-  return [...uniqueRuns.entries()]
+  const candidates = [...uniqueRuns.entries()]
     .sort(([keyA, runA], [keyB, runB]) => runA.score - runB.score || keyA.localeCompare(keyB))
-    .slice(0, VARIANT_COUNT)
     .map(([, run]) => run)
+  return selectDiverseRuns(candidates, players.length, teamCount)
 }
 
 function insertTopRun(
@@ -795,31 +841,18 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       separationGroups: normalizedGroups.map((group) => [...group].sort()).sort(),
     }))
 
-    let runs: SplitRun[]
-    let positionRuns: SplitRun[]
-    if (teamCount <= 3 && effectivePlayers.length === teamCount * 5) {
-      const exhaustiveRuns = exhaustiveFiveAsideRuns(
-        effectivePlayers,
-        teamCount,
-        separationGroupIndexes,
-        recentTeammatePairs,
-      )
-      runs = exhaustiveRuns.attributeRuns
-      positionRuns = exhaustiveRuns.positionRuns
-    } else {
-      runs = uniqueSplitRuns(
-        effectivePlayers,
-        teamCount,
-        hashSeed(`${requestSeed}:attributes`),
-        (random) => runSA(effectivePlayers, teamDefs, separationGroupIndexes, recentTeammatePairs, random),
-      )
-      positionRuns = uniqueSplitRuns(
-        effectivePlayers,
-        teamCount,
-        hashSeed(`${requestSeed}:positions`),
-        (random) => runOverallPositionSA(effectivePlayers, teamDefs, separationGroupIndexes, recentTeammatePairs, random),
-      )
-    }
+    const runs = uniqueSplitRuns(
+      effectivePlayers,
+      teamCount,
+      hashSeed(`${requestSeed}:attributes`),
+      (random) => runSA(effectivePlayers, teamDefs, separationGroupIndexes, recentTeammatePairs, random),
+    )
+    const positionRuns = uniqueSplitRuns(
+      effectivePlayers,
+      teamCount,
+      hashSeed(`${requestSeed}:positions`),
+      (random) => runOverallPositionSA(effectivePlayers, teamDefs, separationGroupIndexes, recentTeammatePairs, random),
+    )
 
     const variants = runs.map((run, index) =>
       assembleVariant(effectivePlayers, run.assignment, run.score, index, teamDefs, recentTeammatePairs)
