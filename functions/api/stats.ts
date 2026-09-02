@@ -38,6 +38,12 @@ function sortByPPG(rows: StatRow[]): StatRow[] {
   })
 }
 
+function sortByGamesPlayed(rows: StatRow[]): StatRow[] {
+  return [...rows].sort((a, b) =>
+    b.games_played - a.games_played || a.name.localeCompare(b.name),
+  )
+}
+
 export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   const params = new URL(ctx.request.url).searchParams
   const month = params.get('month')
@@ -154,10 +160,13 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     }
   }
 
-  // Latest and Overall rankings need enough games to make PPG meaningful.
+  // Latest and Overall rankings require a meaningful sample size.
   // Keep the monthly endpoint unfiltered because it is a session-period view.
   const requiresMinimumGames = scope === 'all' || !month
-  const playerStats = sortByPPG(Object.values(statsMap)).filter(
+  const sortedStats = scope === 'all'
+    ? sortByGamesPlayed(Object.values(statsMap))
+    : sortByPPG(Object.values(statsMap))
+  const playerStats = sortedStats.filter(
     (player) => !requiresMinimumGames || player.games_played >= SCORE_WINDOW,
   )
 

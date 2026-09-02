@@ -710,7 +710,7 @@ export function StatsTab({ loggedIn = false }: StatsTabProps) {
               {view === 'overall' ? (
                 <>
                   <p className="font-semibold">How the Overall ranking works</p>
-                  <p>· Ranked by <strong>PPG</strong> (points per game): Win = 3 pts, Draw = 1 pt, Loss = 0 pts</p>
+                  <p>· Ranked by <strong>games played</strong>, from most to least</p>
                   <p>· Score calculated from <strong>all recorded games</strong></p>
                 </>
               ) : (
