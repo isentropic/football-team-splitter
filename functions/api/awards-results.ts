@@ -1,5 +1,5 @@
 import { requireAdmin, jsonError, type Env } from '../_lib/db'
-import { eligiblePlayers, privateJson } from '../_lib/awards'
+import { eligiblePlayers, isAwardPlayerExcluded, privateJson } from '../_lib/awards'
 import { AWARD_YEAR, CATEGORIES, type Ballot } from '../../src/lib/awards'
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
@@ -12,14 +12,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     env.DB.prepare('SELECT voter_id, ballot, submitted_at FROM award_ballots WHERE year = ?').bind(AWARD_YEAR).all<{ voter_id: string; ballot: string; submitted_at: number }>(),
     env.DB.prepare('SELECT id, name FROM players').all<{ id: string; name: string }>(),
   ])
+  const includedBallots = ballots.filter(row => !isAwardPlayerExcluded(row.voter_id))
   const nameMap = new Map(names.map(p => [p.id, p.name]))
   const categories = CATEGORIES.map(category => {
     const scores = new Map<string, { id: string; name: string; points: number; first: number; second: number; third: number }>()
     let count = 0
-    for (const row of ballots) {
+    for (const row of includedBallots) {
       const picks = (JSON.parse(row.ballot) as Ballot)[category.id] ?? []
       if (picks.length) count++
       picks.forEach((id, index) => {
+        if (isAwardPlayerExcluded(id)) return
         const score = scores.get(id) ?? { id, name: nameMap.get(id) ?? 'Former player', points: 0, first: 0, second: 0, third: 0 }
         score.points += 3 - index
         if (index === 0) score.first++
@@ -37,6 +39,6 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     })
     return { id: category.id, ballots: count, standings }
   })
-  return privateJson({ eligible: players.length, submitted: ballots.length, categories,
-    participation: players.map(p => ({ ...p, submittedAt: ballots.find(b => b.voter_id === p.id)?.submitted_at ?? null })) })
+  return privateJson({ eligible: players.length, submitted: includedBallots.length, categories,
+    participation: players.map(p => ({ ...p, submittedAt: includedBallots.find(b => b.voter_id === p.id)?.submitted_at ?? null })) })
 }
