@@ -1,5 +1,4 @@
 name = "seoulnomads"
-account_id = "8802c988895378137ab2863a9ce8147a"
 compatibility_date = "2024-10-22"
 pages_build_output_dir = "./dist"
 

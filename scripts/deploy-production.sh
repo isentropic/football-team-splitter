@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+export CLOUDFLARE_ACCOUNT_ID="8802c988895378137ab2863a9ce8147a"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 npm run build

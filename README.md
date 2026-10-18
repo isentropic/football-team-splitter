@@ -80,7 +80,7 @@ Voting: `/awards`. Admin results and participation: `/awards/admin` (existing ad
 Production is `https://seoulnomads.pages.dev`, configured explicitly in `wrangler.production.toml`. Before deploying, apply the additive awards migration to production. Do not run `schema.sql`, which drops players.
 
 ```sh
-npx wrangler d1 execute DB --config wrangler.production.toml --remote --file migrations/v4.sql
+CLOUDFLARE_ACCOUNT_ID=8802c988895378137ab2863a9ce8147a npx wrangler d1 execute DB --config wrangler.production.toml --remote --file migrations/v4.sql
 bash scripts/deploy-production.sh
 ```
 
