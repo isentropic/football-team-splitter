@@ -19,8 +19,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const clean: Record<string, string[]> = {}
   for (const category of CATEGORIES) {
     const picks = ballot[category.id] ?? []
-    if (!Array.isArray(picks) || ![0, 3].includes(picks.length) || new Set(picks).size !== picks.length || picks.some(id => typeof id !== 'string' || !ids.has(id) || id === body.voterId)) {
-      return jsonError('Choose three different players per category, or skip it. Self-voting is not allowed.')
+    if (!Array.isArray(picks) || picks.length > 3 || new Set(picks).size !== picks.length || picks.some(id => typeof id !== 'string' || !ids.has(id) || id === body.voterId)) {
+      return jsonError('Choose up to three different players per category, or skip it. Self-voting is not allowed.')
     }
     clean[category.id] = picks
   }
