@@ -71,3 +71,23 @@ export default defineConfig([
   },
 ])
 ```
+
+
+## Club Awards 2026
+
+Voting: `/awards`. Admin results and participation: `/awards/admin` (existing admin login).
+
+Production is `https://seoulnomads.pages.dev`, configured explicitly in `wrangler.production.toml`. Before deploying, apply the additive awards migration to production. Do not run `schema.sql`, which drops players.
+
+```sh
+npx wrangler d1 execute DB --config wrangler.production.toml --remote --file migrations/v4.sql
+npm run build
+npx wrangler pages deploy dist --config wrangler.production.toml --project-name seoulnomads --branch main
+```
+
+Regular local database migration:
+```sh
+node node_modules/wrangler/bin/wrangler.js d1 execute DB --local --file migrations/v4.sql
+```
+
+Eligibility uses non-retired players appearing on a participating team in a recorded 2026 game, using Seoul calendar boundaries. Voting opens October 16 and closes October 24 at 00:00 KST. Ballots contain three choices or an empty list per category and at least one completed category. A database primary key enforces one final ballot per player/year. Results use points, first-place votes, then second-place votes; remaining ties share a rank. Individual ballots are never returned by the results API. Selecting a name is trust-based identification. Private invitation links can be added later.

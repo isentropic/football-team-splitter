@@ -1,0 +1,9 @@
+name = "seoulnomads"
+account_id = "8802c988895378137ab2863a9ce8147a"
+compatibility_date = "2024-10-22"
+pages_build_output_dir = "./dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "seoulnomads"
+database_id = "022e499f-52ed-4e47-b9a4-49b7e36b3a48"

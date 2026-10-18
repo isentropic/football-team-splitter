@@ -212,6 +212,8 @@ export default function App() {
         </div>
       </header>
 
+      <a href="/awards" className="block bg-amber-50 border-b border-amber-200 px-4 py-3 text-center text-sm font-semibold text-amber-900">🏆 Seoul Nomads Awards 2026 · Cast your vote →</a>
+
       <main className={cn('flex-1 px-4 py-4 overflow-y-auto', loggedIn && 'pb-24')}>
         {activeTab === 'stats' && <StatsTab loggedIn={loggedIn} />}
         {activeTab !== 'stats' && !loggedIn && (
