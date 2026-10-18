@@ -81,9 +81,10 @@ Production is `https://seoulnomads.pages.dev`, configured explicitly in `wrangle
 
 ```sh
 npx wrangler d1 execute DB --config wrangler.production.toml --remote --file migrations/v4.sql
-npm run build
-npx wrangler pages deploy dist --config wrangler.production.toml --project-name seoulnomads --branch main
+bash scripts/deploy-production.sh
 ```
+
+The deployment script builds the app and stages the production configuration as `wrangler.toml`, as required by Cloudflare Pages. It includes Functions and shared source imports, and does not copy local credentials or database files.
 
 Regular local database migration:
 ```sh
