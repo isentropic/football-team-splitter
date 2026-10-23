@@ -1,6 +1,6 @@
 export const AWARD_YEAR = 2026
 export const OPENS_AT = '2026-10-16T00:00:00+09:00'
-export const CLOSES_AT = '2026-10-24T00:00:00+09:00'
+export const CLOSES_AT = '2026-10-23T22:00:00+09:00'
 export const CATEGORIES = [
   { id: 'ballon-dor', name: "Ballon d’Or", icon: '🏆', description: 'The best overall player of the year.' },
   { id: 'attacker', name: 'Best Attacker', icon: '⚡', description: 'Outstanding attacking play and goalscoring.' },

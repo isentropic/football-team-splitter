@@ -61,7 +61,7 @@ export default function AwardsPage({ admin = false }: { admin?: boolean }) {
     <main className="awards-main">
       <div className="awards-eyebrow">SEOUL NOMADS</div>
       <h1>Awards 2026</h1>
-      <div className="awards-deadline">Closes October 23 at 11:59 pm · Seoul time</div>
+      <div className="awards-deadline">Closes Friday, October 23 at 10:00 pm · Korean time</div>
       {error && <div role="alert" className="awards-error">{error}<button onClick={() => { setError(''); setReload(r => r + 1) }}>Retry loading</button></div>}
       {admin ? <>
         <h2 className="awards-section-title">Admin · Results & participation</h2>
@@ -76,7 +76,7 @@ export default function AwardsPage({ admin = false }: { admin?: boolean }) {
           })}
           <section className="awards-panel"><h2>Participation</h2>{results.participation.map(p => <div className="awards-participation" key={p.id}><span>{p.name}</span><span>{p.submittedAt ? '✓ Submitted' : 'Awaiting vote'}</span></div>)}</section>
         </>}
-      </> : !config ? <p role="status">Loading eligible players…</p> : submitted ? <section className="awards-panel awards-success"><div>🏆</div><h2>Vote submitted</h2><p>Thank you, {voter?.name}. Your ballot is final. Results will be announced by the club.</p><a className="awards-primary" href="/">Back to the club</a></section> : !config.isOpen ? <section className="awards-panel"><h2>Voting is closed</h2><p>Voting runs October 16–23, 2026, Seoul time. Results will be announced by the club.</p></section> : !started ? <>
+      </> : !config ? <p role="status">Loading eligible players…</p> : submitted ? <section className="awards-panel awards-success"><div>🏆</div><h2>Vote submitted</h2><p>Thank you, {voter?.name}. Your ballot is final. Results will be announced by the club.</p><a className="awards-primary" href="/">Back to the club</a></section> : !config.isOpen ? <section className="awards-panel"><h2>Voting is closed</h2><p>Voting closed on October 23, 2026 at 10:00 pm Korean time. Results will be announced by the club.</p></section> : !started ? <>
         <p className="awards-rules">Rank one, two, or three teammates per award: first choice earns 3 points, second earns 2, and third earns 1. You can skip a category. No self-voting. Review your choices before submitting; each player gets one final ballot.</p>
         <section className="awards-panel"><h2>Select your name</h2><p>Open to active players who played in 2026.</p>
           <label className="awards-search">Find your name<input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search players…" type="search" /></label>
